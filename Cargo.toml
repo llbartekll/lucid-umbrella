@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/erc7730"]
+resolver = "2"
