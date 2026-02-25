@@ -85,9 +85,7 @@ impl ArgumentValue {
                 serde_json::Value::String(hex_str)
             }
             ArgumentValue::Bool(b) => serde_json::Value::Bool(*b),
-            ArgumentValue::Bytes(b) => {
-                serde_json::Value::String(format!("0x{}", hex::encode(b)))
-            }
+            ArgumentValue::Bytes(b) => serde_json::Value::String(format!("0x{}", hex::encode(b))),
             ArgumentValue::FixedBytes(b) => {
                 serde_json::Value::String(format!("0x{}", hex::encode(b)))
             }
@@ -245,21 +243,19 @@ fn parse_param_type(s: &str) -> Result<ParamType, DecodeError> {
             let bits = if s == "int" {
                 256
             } else {
-                s[3..].parse::<usize>().map_err(|_| {
-                    DecodeError::InvalidSignature(format!("invalid int width: {s}"))
-                })?
+                s[3..]
+                    .parse::<usize>()
+                    .map_err(|_| DecodeError::InvalidSignature(format!("invalid int width: {s}")))?
             };
             Ok(ParamType::Int(bits))
         }
         _ if s.starts_with("bytes") => {
-            let size: usize = s[5..].parse().map_err(|_| {
-                DecodeError::InvalidSignature(format!("invalid bytes width: {s}"))
-            })?;
+            let size: usize = s[5..]
+                .parse()
+                .map_err(|_| DecodeError::InvalidSignature(format!("invalid bytes width: {s}")))?;
             Ok(ParamType::FixedBytes(size))
         }
-        _ => Err(DecodeError::InvalidSignature(format!(
-            "unknown type: {s}"
-        ))),
+        _ => Err(DecodeError::InvalidSignature(format!("unknown type: {s}"))),
     }
 }
 
@@ -284,7 +280,11 @@ fn canonical_param(p: &ParamType) -> String {
         ParamType::Array(inner) => format!("{}[]", canonical_param(inner)),
         ParamType::FixedArray(inner, size) => format!("{}[{size}]", canonical_param(inner)),
         ParamType::Tuple(members) => {
-            let inner = members.iter().map(canonical_param).collect::<Vec<_>>().join(",");
+            let inner = members
+                .iter()
+                .map(canonical_param)
+                .collect::<Vec<_>>()
+                .join(",");
             format!("({inner})")
         }
     }
@@ -342,7 +342,11 @@ pub fn decode_calldata(
 }
 
 /// Decode a single value from ABI-encoded data.
-fn decode_value(param: &ParamType, data: &[u8], head_offset: usize) -> Result<ArgumentValue, DecodeError> {
+fn decode_value(
+    param: &ParamType,
+    data: &[u8],
+    head_offset: usize,
+) -> Result<ArgumentValue, DecodeError> {
     if param.is_dynamic() {
         // Dynamic types: head contains offset to tail
         let offset = read_u256_as_usize(data, head_offset)?;
@@ -353,7 +357,11 @@ fn decode_value(param: &ParamType, data: &[u8], head_offset: usize) -> Result<Ar
 }
 
 /// Decode a value at a specific byte offset.
-fn decode_value_at(param: &ParamType, data: &[u8], offset: usize) -> Result<ArgumentValue, DecodeError> {
+fn decode_value_at(
+    param: &ParamType,
+    data: &[u8],
+    offset: usize,
+) -> Result<ArgumentValue, DecodeError> {
     ensure_bytes(data, offset, 32)?;
 
     match param {
@@ -398,9 +406,7 @@ fn decode_value_at(param: &ParamType, data: &[u8], offset: usize) -> Result<Argu
             let elements_start = offset + 32;
             decode_array_elements(inner, data, elements_start, len)
         }
-        ParamType::FixedArray(inner, len) => {
-            decode_array_elements(inner, data, offset, *len)
-        }
+        ParamType::FixedArray(inner, len) => decode_array_elements(inner, data, offset, *len),
         ParamType::Tuple(members) => {
             let mut values = Vec::with_capacity(members.len());
             let mut member_offset = offset;

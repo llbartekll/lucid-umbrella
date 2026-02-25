@@ -155,7 +155,15 @@ mod tests {
         calldata.extend_from_slice(&amount_word);
 
         let tokens = EmptyTokenSource;
-        let result = format_calldata(&descriptor, 1, "0xdac17f958d2ee523a2206206994597c13d831ec7", &calldata, None, &tokens).unwrap();
+        let result = format_calldata(
+            &descriptor,
+            1,
+            "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            &calldata,
+            None,
+            &tokens,
+        )
+        .unwrap();
 
         assert_eq!(result.intent, "Transfer tokens");
         assert_eq!(result.entries.len(), 2);
@@ -225,7 +233,9 @@ mod tests {
         let mut calldata = Vec::new();
         calldata.extend_from_slice(&sig.selector);
         // token address
-        let token_addr = hex::decode("000000000000000000000000dac17f958d2ee523a2206206994597c13d831ec7").unwrap();
+        let token_addr =
+            hex::decode("000000000000000000000000dac17f958d2ee523a2206206994597c13d831ec7")
+                .unwrap();
         calldata.extend_from_slice(&token_addr);
         // amount: 1_000_000 (1 USDT with 6 decimals)
         let mut amount_word = [0u8; 32];
@@ -318,7 +328,8 @@ mod tests {
         calldata.extend_from_slice(&[0u8; 32]); // arg 0
         calldata.extend_from_slice(&[0u8; 32]); // arg 1
 
-        let result = format_calldata(&descriptor, 1, "0xabc", &calldata, None, &EmptyTokenSource).unwrap();
+        let result =
+            format_calldata(&descriptor, 1, "0xabc", &calldata, None, &EmptyTokenSource).unwrap();
 
         // Only 1 field should be visible (the second has visible: false)
         assert_eq!(result.entries.len(), 1);
@@ -385,7 +396,8 @@ mod tests {
         amount[31] = 100;
         calldata.extend_from_slice(&amount);
 
-        let result = format_calldata(&descriptor, 1, "0xabc", &calldata, None, &EmptyTokenSource).unwrap();
+        let result =
+            format_calldata(&descriptor, 1, "0xabc", &calldata, None, &EmptyTokenSource).unwrap();
 
         assert_eq!(result.entries.len(), 1);
         if let DisplayEntry::Group { label, items, .. } = &result.entries[0] {
@@ -452,7 +464,8 @@ mod tests {
         word[31] = 1; // value = 1 → "Limit"
         calldata.extend_from_slice(&word);
 
-        let result = format_calldata(&descriptor, 1, "0xabc", &calldata, None, &EmptyTokenSource).unwrap();
+        let result =
+            format_calldata(&descriptor, 1, "0xabc", &calldata, None, &EmptyTokenSource).unwrap();
 
         if let DisplayEntry::Item(ref item) = result.entries[0] {
             assert_eq!(item.label, "Order Type");
@@ -548,10 +561,7 @@ mod tests {
 
         if let DisplayEntry::Item(ref item) = result.entries[0] {
             assert_eq!(item.label, "Spender");
-            assert_eq!(
-                item.value,
-                "0x1234567890123456789012345678901234567890"
-            );
+            assert_eq!(item.value, "0x1234567890123456789012345678901234567890");
         }
 
         if let DisplayEntry::Item(ref item) = result.entries[1] {

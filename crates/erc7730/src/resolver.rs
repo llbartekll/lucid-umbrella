@@ -66,8 +66,8 @@ impl StaticSource {
         address: &str,
         json: &str,
     ) -> Result<(), ResolveError> {
-        let descriptor: Descriptor = serde_json::from_str(json)
-            .map_err(|e| ResolveError::Parse(e.to_string()))?;
+        let descriptor: Descriptor =
+            serde_json::from_str(json).map_err(|e| ResolveError::Parse(e.to_string()))?;
         self.add_calldata(chain_id, address, descriptor);
         Ok(())
     }
@@ -79,8 +79,8 @@ impl StaticSource {
         address: &str,
         json: &str,
     ) -> Result<(), ResolveError> {
-        let descriptor: Descriptor = serde_json::from_str(json)
-            .map_err(|e| ResolveError::Parse(e.to_string()))?;
+        let descriptor: Descriptor =
+            serde_json::from_str(json).map_err(|e| ResolveError::Parse(e.to_string()))?;
         self.add_typed(chain_id, address, descriptor);
         Ok(())
     }

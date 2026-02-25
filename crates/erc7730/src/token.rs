@@ -45,7 +45,8 @@ impl StaticTokenSource {
     }
 
     pub fn insert(&mut self, chain_id: u64, address: &str, meta: TokenMeta) {
-        self.tokens.insert(TokenLookupKey::new(chain_id, address), meta);
+        self.tokens
+            .insert(TokenLookupKey::new(chain_id, address), meta);
     }
 }
 

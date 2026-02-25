@@ -86,9 +86,10 @@ pub fn format_typed_data(
             .intent
             .clone()
             .unwrap_or_else(|| data.primary_type.clone()),
-        interpolated_intent: format.interpolated_intent.as_ref().map(|template| {
-            interpolate_typed_intent(template, &data.message)
-        }),
+        interpolated_intent: format
+            .interpolated_intent
+            .as_ref()
+            .map(|template| interpolate_typed_intent(template, &data.message)),
         entries,
         warnings,
     })
@@ -336,8 +337,7 @@ fn format_typed_value(
             };
 
             if let Some(meta) = token_meta {
-                let formatted =
-                    crate::engine::format_with_decimals(&amount, meta.decimals);
+                let formatted = crate::engine::format_with_decimals(&amount, meta.decimals);
                 Ok(format!("{formatted} {}", meta.symbol))
             } else {
                 Ok(amount.to_string())
@@ -351,9 +351,10 @@ fn format_typed_value(
             };
             let dt = time::OffsetDateTime::from_unix_timestamp(ts)
                 .map_err(|e| Error::Render(format!("invalid timestamp: {e}")))?;
-            let format =
-                time::format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second] UTC")
-                    .map_err(|e| Error::Render(format!("format error: {e}")))?;
+            let format = time::format_description::parse(
+                "[year]-[month]-[day] [hour]:[minute]:[second] UTC",
+            )
+            .map_err(|e| Error::Render(format!("format error: {e}")))?;
             Ok(dt
                 .format(&format)
                 .map_err(|e| Error::Render(format!("format error: {e}")))?)
@@ -471,10 +472,7 @@ mod tests {
 
     #[test]
     fn test_json_value_to_string() {
-        assert_eq!(
-            json_value_to_string(&serde_json::json!("hello")),
-            "hello"
-        );
+        assert_eq!(json_value_to_string(&serde_json::json!("hello")), "hello");
         assert_eq!(json_value_to_string(&serde_json::json!(42)), "42");
         assert_eq!(json_value_to_string(&serde_json::json!(true)), "true");
     }

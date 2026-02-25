@@ -40,7 +40,9 @@ impl AddressBook {
 
     /// Look up a label for an address.
     pub fn resolve(&self, address: &str) -> Option<&str> {
-        self.entries.get(&address.to_lowercase()).map(|s| s.as_str())
+        self.entries
+            .get(&address.to_lowercase())
+            .map(|s| s.as_str())
     }
 
     /// Add or override an entry.

@@ -185,13 +185,7 @@ fn render_fields(
                     continue;
                 }
 
-                let formatted = format_value(
-                    ctx,
-                    &value,
-                    format.as_ref(),
-                    params.as_ref(),
-                    path,
-                )?;
+                let formatted = format_value(ctx, &value, format.as_ref(), params.as_ref(), path)?;
 
                 entries.push(DisplayEntry::Item(DisplayItem {
                     label: label.clone(),
@@ -216,7 +210,9 @@ fn render_field_group(
         for entry in sub_entries {
             match entry {
                 DisplayEntry::Item(item) => items.push(item),
-                DisplayEntry::Group { items: sub_items, .. } => {
+                DisplayEntry::Group {
+                    items: sub_items, ..
+                } => {
                     items.extend(sub_items);
                 }
             }
@@ -335,8 +331,7 @@ fn format_value(
     path: &str,
 ) -> Result<String, Error> {
     let Some(val) = value else {
-        ctx.warnings
-            .push(format!("could not resolve path: {path}"));
+        ctx.warnings.push(format!("could not resolve path: {path}"));
         return Ok("<unresolved>".to_string());
     };
 
@@ -373,7 +368,10 @@ fn format_value(
         FieldFormat::Raw => Ok(format_raw(val)),
         FieldFormat::TokenTicker => format_token_ticker(ctx, val, params),
         FieldFormat::ChainId => format_chain_id(val),
-        FieldFormat::Calldata | FieldFormat::NftName | FieldFormat::Duration | FieldFormat::Unit => {
+        FieldFormat::Calldata
+        | FieldFormat::NftName
+        | FieldFormat::Duration
+        | FieldFormat::Unit => {
             // Not yet implemented — render raw with warning
             ctx.warnings
                 .push(format!("format {:?} not yet implemented", fmt));
@@ -466,9 +464,7 @@ fn format_token_amount(
     params: Option<&FormatParams>,
 ) -> Result<String, Error> {
     let raw_amount = match val {
-        ArgumentValue::Uint(bytes) | ArgumentValue::Int(bytes) => {
-            BigUint::from_bytes_be(bytes)
-        }
+        ArgumentValue::Uint(bytes) | ArgumentValue::Int(bytes) => BigUint::from_bytes_be(bytes),
         _ => return Ok(format_raw(val)),
     };
 
@@ -529,17 +525,14 @@ fn format_token_ticker(
         }
     }
 
-    ctx.warnings
-        .push("token ticker not found".to_string());
+    ctx.warnings.push("token ticker not found".to_string());
     Ok(format_raw(val))
 }
 
 fn format_chain_id(val: &ArgumentValue) -> Result<String, Error> {
     if let ArgumentValue::Uint(bytes) = val {
         let n = BigUint::from_bytes_be(bytes);
-        let chain_id: u64 = n
-            .try_into()
-            .unwrap_or(0);
+        let chain_id: u64 = n.try_into().unwrap_or(0);
         Ok(chain_name(chain_id))
     } else {
         Ok(format_raw(val))
@@ -605,9 +598,10 @@ fn format_date(val: &ArgumentValue) -> Result<String, Error> {
             let dt = time::OffsetDateTime::from_unix_timestamp(timestamp)
                 .map_err(|e| Error::Render(format!("invalid timestamp: {e}")))?;
 
-            let format =
-                time::format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second] UTC")
-                    .map_err(|e| Error::Render(format!("format error: {e}")))?;
+            let format = time::format_description::parse(
+                "[year]-[month]-[day] [hour]:[minute]:[second] UTC",
+            )
+            .map_err(|e| Error::Render(format!("format error: {e}")))?;
 
             Ok(dt
                 .format(&format)
@@ -638,11 +632,7 @@ fn format_enum(
 }
 
 /// Resolve a map reference to a display value.
-fn resolve_map(
-    ctx: &RenderContext<'_>,
-    map_ref: &str,
-    val: &ArgumentValue,
-) -> Option<String> {
+fn resolve_map(ctx: &RenderContext<'_>, map_ref: &str, val: &ArgumentValue) -> Option<String> {
     let raw = format_raw(val);
     let map_def = ctx.descriptor.metadata.maps.get(map_ref)?;
     map_def.entries.get(&raw).cloned()
@@ -729,8 +719,7 @@ mod tests {
     #[test]
     fn test_eip55_checksum() {
         // Known checksum: 0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed
-        let addr_bytes =
-            hex::decode("5aaeb6053f3e94c9b9a09f33669435e7ef1beaed").unwrap();
+        let addr_bytes = hex::decode("5aaeb6053f3e94c9b9a09f33669435e7ef1beaed").unwrap();
         let mut addr = [0u8; 20];
         addr.copy_from_slice(&addr_bytes);
         let checksummed = eip55_checksum(&addr);
@@ -753,12 +742,18 @@ mod tests {
                 DecodedArgument {
                     index: 1,
                     param_type: ParamType::Uint(256),
-                    value: ArgumentValue::Uint(vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x03, 0xe8]),
+                    value: ArgumentValue::Uint(vec![
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0x03, 0xe8,
+                    ]),
                 },
             ],
         };
 
         let result = interpolate_intent("Send ${1} to ${0}", &decoded);
-        assert_eq!(result, "Send 1000 to 0x0000000000000000000000000000000000000000");
+        assert_eq!(
+            result,
+            "Send 1000 to 0x0000000000000000000000000000000000000000"
+        );
     }
 }
