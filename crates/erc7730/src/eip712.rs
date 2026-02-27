@@ -89,7 +89,7 @@ pub fn format_typed_data(
         interpolated_intent: format
             .interpolated_intent
             .as_ref()
-            .map(|template| interpolate_typed_intent(template, &data.message)),
+            .map(|template| interpolate_typed_intent(template, &data.message, &format.fields)),
         entries,
         warnings,
     })
@@ -429,7 +429,11 @@ fn json_value_to_string(val: &serde_json::Value) -> String {
     }
 }
 
-fn interpolate_typed_intent(template: &str, message: &serde_json::Value) -> String {
+fn interpolate_typed_intent(
+    template: &str,
+    message: &serde_json::Value,
+    fields: &[DisplayField],
+) -> String {
     let mut result = template.to_string();
     while let Some(start) = result.find("${") {
         let end = match result[start..].find('}') {
@@ -438,7 +442,42 @@ fn interpolate_typed_intent(template: &str, message: &serde_json::Value) -> Stri
         };
         let path = &result[start + 2..end];
         let replacement = resolve_typed_path(message, path)
-            .map(|v| json_value_to_string(&v))
+            .map(|v| {
+                let field_format = fields.iter().find_map(|f| {
+                    if let DisplayField::Simple {
+                        path: fp, format, ..
+                    } = f
+                    {
+                        if fp == path {
+                            format.as_ref()
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                });
+                match field_format {
+                    Some(FieldFormat::Date) => {
+                        let ts: i64 = match &v {
+                            serde_json::Value::Number(n) => n.as_i64().unwrap_or(0),
+                            serde_json::Value::String(s) => s.parse().unwrap_or(0),
+                            _ => 0,
+                        };
+                        if let Ok(dt) = time::OffsetDateTime::from_unix_timestamp(ts) {
+                            if let Ok(fmt) = time::format_description::parse(
+                                "[year]-[month]-[day] [hour]:[minute]:[second] UTC",
+                            ) {
+                                if let Ok(s) = dt.format(&fmt) {
+                                    return s;
+                                }
+                            }
+                        }
+                        json_value_to_string(&v)
+                    }
+                    _ => json_value_to_string(&v),
+                }
+            })
             .unwrap_or_else(|| "<?>".to_string());
         result.replace_range(start..=end, &replacement);
     }

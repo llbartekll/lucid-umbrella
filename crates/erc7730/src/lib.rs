@@ -501,6 +501,73 @@ mod tests {
     }
 
     #[test]
+    fn test_stakeweight_increase_unlock_time() {
+        let json = r#"{
+            "context": {
+                "contract": {
+                    "deployments": [
+                        { "chainId": 10, "address": "0x521B4C065Bbdbe3E20B3727340730936912DfA46" }
+                    ]
+                }
+            },
+            "metadata": {
+                "owner": "WalletConnect",
+                "contractName": "StakeWeight",
+                "enums": {},
+                "constants": {},
+                "addressBook": {},
+                "maps": {}
+            },
+            "display": {
+                "definitions": {},
+                "formats": {
+                    "increaseUnlockTime(uint256)": {
+                        "intent": "Increase Unlock Time",
+                        "interpolatedIntent": "Increase unlock time to ${@.0}",
+                        "fields": [
+                            {
+                                "path": "@.0",
+                                "label": "New Unlock Time",
+                                "format": "date"
+                            }
+                        ]
+                    }
+                }
+            }
+        }"#;
+
+        let descriptor = Descriptor::from_json(json).unwrap();
+        // Real calldata from yttrium test
+        let calldata =
+            hex::decode("7c616fe6000000000000000000000000000000000000000000000000000000006945563d")
+                .unwrap();
+
+        let result = format_calldata(
+            &descriptor,
+            10,
+            "0x521B4C065Bbdbe3E20B3727340730936912DfA46",
+            &calldata,
+            None,
+            &EmptyTokenSource,
+        )
+        .unwrap();
+
+        assert_eq!(result.intent, "Increase Unlock Time");
+        assert_eq!(result.entries.len(), 1);
+        if let DisplayEntry::Item(ref item) = result.entries[0] {
+            assert_eq!(item.label, "New Unlock Time");
+            assert_eq!(item.value, "2025-12-19 13:42:21 UTC");
+        } else {
+            panic!("expected Item");
+        }
+        assert_eq!(
+            result.interpolated_intent.as_deref(),
+            Some("Increase unlock time to 2025-12-19 13:42:21 UTC")
+        );
+        assert!(result.warnings.is_empty());
+    }
+
+    #[test]
     fn test_eip712_format() {
         let json = r#"{
             "context": {

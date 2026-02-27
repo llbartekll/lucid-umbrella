@@ -105,7 +105,7 @@ pub fn format_calldata(
     let interpolated = format
         .interpolated_intent
         .as_ref()
-        .map(|template| interpolate_intent(template, decoded));
+        .map(|template| interpolate_intent(template, decoded, &format.fields));
 
     Ok(DisplayModel {
         intent: format
@@ -670,7 +670,14 @@ pub(crate) fn format_with_decimals(amount: &BigUint, decimals: u8) -> String {
 }
 
 /// Interpolate `${path}` templates in an intent string.
-fn interpolate_intent(template: &str, decoded: &DecodedArguments) -> String {
+///
+/// When `fields` contains a matching `DisplayField::Simple` with a stateless format
+/// (Date, Number, Address), uses that formatter instead of raw formatting.
+fn interpolate_intent(
+    template: &str,
+    decoded: &DecodedArguments,
+    fields: &[DisplayField],
+) -> String {
     let mut result = template.to_string();
     // Find all ${...} patterns and replace them
     while let Some(start) = result.find("${") {
@@ -680,7 +687,29 @@ fn interpolate_intent(template: &str, decoded: &DecodedArguments) -> String {
         };
         let path = &result[start + 2..end];
         let replacement = resolve_path(decoded, path)
-            .map(|v| format_raw(&v))
+            .map(|v| {
+                // Look up field format for this path
+                let field_format = fields.iter().find_map(|f| {
+                    if let DisplayField::Simple {
+                        path: fp, format, ..
+                    } = f
+                    {
+                        if fp == path {
+                            format.as_ref()
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                });
+                match field_format {
+                    Some(FieldFormat::Date) => format_date(&v).unwrap_or_else(|_| format_raw(&v)),
+                    Some(FieldFormat::Number) => format_number(&v),
+                    Some(FieldFormat::Address) => format_address(&v),
+                    _ => format_raw(&v),
+                }
+            })
             .unwrap_or_else(|| "<?>".to_string());
         result.replace_range(start..=end, &replacement);
     }
@@ -750,7 +779,7 @@ mod tests {
             ],
         };
 
-        let result = interpolate_intent("Send ${1} to ${0}", &decoded);
+        let result = interpolate_intent("Send ${1} to ${0}", &decoded, &[]);
         assert_eq!(
             result,
             "Send 1000 to 0x0000000000000000000000000000000000000000"
