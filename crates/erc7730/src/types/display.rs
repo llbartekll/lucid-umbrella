@@ -1,3 +1,5 @@
+//! Display configuration types: field formats, visibility rules, and layout groups.
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

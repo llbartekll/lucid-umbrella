@@ -1,3 +1,5 @@
+//! Descriptor metadata: owner info, token details, enums, constants, and address books.
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

@@ -1,3 +1,6 @@
+//! Pluggable descriptor resolution via the [`DescriptorSource`] trait.
+//! Includes [`StaticSource`] for testing and embedded use cases.
+
 use std::collections::HashMap;
 
 use crate::error::ResolveError;

@@ -1,3 +1,8 @@
+//! ERC-7730 v2 clear signing library — decodes and formats contract calldata
+//! and EIP-712 typed data for human-readable display using JSON descriptors.
+//!
+//! Entry points: [`format_calldata()`], [`format_typed_data()`], [`format()`].
+
 pub mod address_book;
 pub mod decoder;
 pub mod eip712;

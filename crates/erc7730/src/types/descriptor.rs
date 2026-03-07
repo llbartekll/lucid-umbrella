@@ -1,3 +1,5 @@
+//! Top-level [`Descriptor`] type — the root of an ERC-7730 JSON descriptor.
+
 use serde::{Deserialize, Serialize};
 
 use super::context::DescriptorContext;

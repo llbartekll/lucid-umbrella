@@ -1,3 +1,6 @@
+//! Formatting pipeline: resolves display fields, formats decoded values,
+//! and produces a [`DisplayModel`] with labeled entries for wallet UIs.
+
 use num_bigint::BigUint;
 
 use crate::address_book::AddressBook;

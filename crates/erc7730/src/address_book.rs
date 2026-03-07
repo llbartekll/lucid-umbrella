@@ -1,3 +1,5 @@
+//! Address-to-label resolution from descriptor metadata and deployment context.
+
 use std::collections::HashMap;
 
 use crate::types::context::DescriptorContext;

@@ -1,3 +1,6 @@
+//! Token metadata resolution via the [`TokenSource`] trait.
+//! Uses CAIP-19 keys (`eip155:{chain}/erc20:{addr}`) for cross-chain lookups.
+
 /// Token metadata.
 #[derive(Debug, Clone)]
 pub struct TokenMeta {

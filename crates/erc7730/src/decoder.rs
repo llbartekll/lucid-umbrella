@@ -1,3 +1,6 @@
+//! Solidity function signature parsing and ABI calldata decoding.
+//! No JSON ABI needed — signatures are parsed directly from descriptor format keys.
+
 use tiny_keccak::{Hasher, Keccak};
 
 use crate::error::DecodeError;

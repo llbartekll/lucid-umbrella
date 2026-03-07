@@ -1,3 +1,6 @@
+//! EIP-712 typed data formatting — parses structured typed data and produces
+//! a [`DisplayModel`](crate::engine::DisplayModel) using the same descriptor format as calldata.
+
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};

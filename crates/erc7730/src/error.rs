@@ -1,3 +1,5 @@
+//! Error types for decoding, resolution, and rendering failures.
+
 use thiserror::Error;
 
 /// Unified error type for the ERC-7730 library.

@@ -1,3 +1,5 @@
+//! Deployment context types: contract deployments and EIP-712 domain bindings.
+
 use serde::{Deserialize, Serialize};
 
 /// Top-level context discriminator — either contract (calldata) or eip712.
