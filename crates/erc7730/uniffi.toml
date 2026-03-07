@@ -1,0 +1,5 @@
+[bindings.kotlin]
+android = true
+android_cleaner = true
+
+[bindings.swift]

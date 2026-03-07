@@ -5,6 +5,18 @@ edition = "2021"
 description = "ERC-7730 v2 clear signing library"
 license = "MIT OR Apache-2.0"
 
+[lib]
+crate-type = ["lib", "staticlib", "cdylib"]
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
+required-features = ["uniffi"]
+
+[features]
+default = []
+uniffi = ["dep:uniffi", "uniffi/cli"]
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -13,3 +25,4 @@ tiny-keccak = { version = "2", features = ["keccak"] }
 hex = "0.4"
 time = { version = "0.3", features = ["formatting", "macros"] }
 thiserror = "2"
+uniffi = { version = "0.31.0", default-features = false, optional = true }

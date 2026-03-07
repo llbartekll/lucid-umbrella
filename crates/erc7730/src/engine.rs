@@ -13,6 +13,7 @@ use crate::types::display::{
 };
 
 /// Output model for clear signing display.
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Debug, Clone)]
 pub struct DisplayModel {
     pub intent: String,
@@ -22,6 +23,7 @@ pub struct DisplayModel {
 }
 
 /// A display entry — either a flat item or a group of items.
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[derive(Debug, Clone)]
 pub enum DisplayEntry {
     Item(DisplayItem),
@@ -32,6 +34,7 @@ pub enum DisplayEntry {
     },
 }
 
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[derive(Debug, Clone)]
 pub enum GroupIteration {
     Sequential,
@@ -39,6 +42,7 @@ pub enum GroupIteration {
 }
 
 /// A single label+value pair for display.
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Debug, Clone)]
 pub struct DisplayItem {
     pub label: String,

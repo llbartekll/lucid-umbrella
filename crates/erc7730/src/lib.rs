@@ -3,6 +3,9 @@
 //!
 //! Entry points: [`format_calldata()`], [`format_typed_data()`], [`format()`].
 
+#[cfg(feature = "uniffi")]
+uniffi::setup_scaffolding!();
+
 pub mod address_book;
 pub mod decoder;
 pub mod eip712;
@@ -11,6 +14,8 @@ pub mod error;
 pub mod resolver;
 pub mod token;
 pub mod types;
+#[cfg(feature = "uniffi")]
+pub mod uniffi_compat;
 
 use error::Error;
 
