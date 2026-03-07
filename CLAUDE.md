@@ -32,6 +32,10 @@ Generated binding outputs:
 - `bindings/swift/erc7730FFI.h`
 - `bindings/swift/erc7730FFI.modulemap`
 
+Repository policy:
+- `bindings/swift/` is kept in-repo for SPM consumption.
+- `bindings/kotlin/` is generated locally and gitignored.
+
 ## Code Conventions
 
 - Rust 2021 edition

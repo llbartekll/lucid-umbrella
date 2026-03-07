@@ -77,8 +77,8 @@ FFI API is intentionally stateless and JSON/hex-based.
 
 Generated bindings are written to:
 
-- `bindings/kotlin/`
-- `bindings/swift/`
+- `bindings/kotlin/` (generated locally, gitignored)
+- `bindings/swift/` (kept in-repo for SPM consumption)
 
 ## Working Expectations For Agents
 
