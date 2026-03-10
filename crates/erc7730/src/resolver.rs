@@ -228,8 +228,8 @@ pub struct GitHubRegistrySource {
     base_url: String,
     /// Maps "{chain_id}:{address_lowercase}" → relative path in registry
     index: HashMap<String, String>,
-    /// In-memory descriptor cache
-    cache: std::cell::RefCell<HashMap<String, Descriptor>>,
+    /// In-memory descriptor cache (Mutex for Sync safety)
+    cache: std::sync::Mutex<HashMap<String, Descriptor>>,
 }
 
 #[cfg(feature = "github-registry")]
@@ -242,8 +242,29 @@ impl GitHubRegistrySource {
         Self {
             base_url: base_url.trim_end_matches('/').to_string(),
             index,
-            cache: std::cell::RefCell::new(HashMap::new()),
+            cache: std::sync::Mutex::new(HashMap::new()),
         }
+    }
+
+    /// Create a source by fetching `index.json` from the registry.
+    ///
+    /// The index maps `"{chain_id}:{address_lowercase}"` → relative descriptor path.
+    pub fn from_registry(base_url: &str) -> Result<Self, ResolveError> {
+        let base = base_url.trim_end_matches('/');
+        let index_url = format!("{}/index.json", base);
+        let response = ureq::get(&index_url).call().map_err(|e| match &e {
+            ureq::Error::Status(404, _) => ResolveError::NotFound {
+                chain_id: 0,
+                address: format!("index.json at {index_url}"),
+            },
+            _ => ResolveError::Io(format!("HTTP fetch index failed: {e}")),
+        })?;
+        let body = response
+            .into_string()
+            .map_err(|e| ResolveError::Io(format!("read index response: {e}")))?;
+        let index: HashMap<String, String> =
+            serde_json::from_str(&body).map_err(|e| ResolveError::Parse(e.to_string()))?;
+        Ok(Self::new(base, index))
     }
 
     fn make_key(chain_id: u64, address: &str) -> String {
@@ -252,9 +273,13 @@ impl GitHubRegistrySource {
 
     fn fetch_descriptor(&self, rel_path: &str) -> Result<Descriptor, ResolveError> {
         let url = format!("{}/{}", self.base_url, rel_path);
-        let response = ureq::get(&url)
-            .call()
-            .map_err(|e| ResolveError::Io(format!("HTTP fetch failed: {e}")))?;
+        let response = ureq::get(&url).call().map_err(|e| match &e {
+            ureq::Error::Status(404, _) => ResolveError::NotFound {
+                chain_id: 0,
+                address: format!("descriptor at {url}"),
+            },
+            _ => ResolveError::Io(format!("HTTP fetch failed: {e}")),
+        })?;
         let body = response
             .into_string()
             .map_err(|e| ResolveError::Io(format!("read response: {e}")))?;
@@ -272,7 +297,7 @@ impl DescriptorSource for GitHubRegistrySource {
         let key = Self::make_key(chain_id, address);
 
         // Check cache first
-        if let Some(cached) = self.cache.borrow().get(&key) {
+        if let Some(cached) = self.cache.lock().unwrap().get(&key) {
             return Ok(ResolvedDescriptor {
                 descriptor: cached.clone(),
                 chain_id,
@@ -286,7 +311,10 @@ impl DescriptorSource for GitHubRegistrySource {
         })?;
 
         let descriptor = self.fetch_descriptor(rel_path)?;
-        self.cache.borrow_mut().insert(key, descriptor.clone());
+        self.cache
+            .lock()
+            .unwrap()
+            .insert(key, descriptor.clone());
 
         Ok(ResolvedDescriptor {
             descriptor,

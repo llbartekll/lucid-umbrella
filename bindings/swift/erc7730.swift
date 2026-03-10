@@ -1099,7 +1099,24 @@ fileprivate struct FfiConverterSequenceTypeDisplayEntry: FfiConverterRustBuffer 
         return seq
     }
 }
-public func erc7730FormatCalldata(descriptorJson: String, chainId: UInt64, to: String, calldataHex: String, valueHex: String?, tokens: [TokenMetaInput])throws  -> DisplayModel  {
+/**
+ * High-level: resolve descriptor from GitHub registry, then format calldata.
+ *
+ * Requires the `github-registry` feature.
+ */
+public func erc7730Format(chainId: UInt64, to: String, calldataHex: String, valueHex: String?, fromAddress: String?, tokens: [TokenMetaInput])throws  -> DisplayModel  {
+    return try  FfiConverterTypeDisplayModel_lift(try rustCallWithError(FfiConverterTypeFfiError_lift) {
+    uniffi_erc7730_fn_func_erc7730_format(
+        FfiConverterUInt64.lower(chainId),
+        FfiConverterString.lower(to),
+        FfiConverterString.lower(calldataHex),
+        FfiConverterOptionString.lower(valueHex),
+        FfiConverterOptionString.lower(fromAddress),
+        FfiConverterSequenceTypeTokenMetaInput.lower(tokens),$0
+    )
+})
+}
+public func erc7730FormatCalldata(descriptorJson: String, chainId: UInt64, to: String, calldataHex: String, valueHex: String?, fromAddress: String?, tokens: [TokenMetaInput])throws  -> DisplayModel  {
     return try  FfiConverterTypeDisplayModel_lift(try rustCallWithError(FfiConverterTypeFfiError_lift) {
     uniffi_erc7730_fn_func_erc7730_format_calldata(
         FfiConverterString.lower(descriptorJson),
@@ -1107,6 +1124,20 @@ public func erc7730FormatCalldata(descriptorJson: String, chainId: UInt64, to: S
         FfiConverterString.lower(to),
         FfiConverterString.lower(calldataHex),
         FfiConverterOptionString.lower(valueHex),
+        FfiConverterOptionString.lower(fromAddress),
+        FfiConverterSequenceTypeTokenMetaInput.lower(tokens),$0
+    )
+})
+}
+/**
+ * High-level: resolve descriptor from GitHub registry, then format EIP-712 typed data.
+ *
+ * Requires the `github-registry` feature.
+ */
+public func erc7730FormatTyped(typedDataJson: String, tokens: [TokenMetaInput])throws  -> DisplayModel  {
+    return try  FfiConverterTypeDisplayModel_lift(try rustCallWithError(FfiConverterTypeFfiError_lift) {
+    uniffi_erc7730_fn_func_erc7730_format_typed(
+        FfiConverterString.lower(typedDataJson),
         FfiConverterSequenceTypeTokenMetaInput.lower(tokens),$0
     )
 })
@@ -1136,7 +1167,13 @@ private let initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
-    if (uniffi_erc7730_checksum_func_erc7730_format_calldata() != 3309) {
+    if (uniffi_erc7730_checksum_func_erc7730_format() != 46408) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_erc7730_checksum_func_erc7730_format_calldata() != 45099) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_erc7730_checksum_func_erc7730_format_typed() != 21669) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_erc7730_checksum_func_erc7730_format_typed_data() != 31759) {

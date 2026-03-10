@@ -28,11 +28,11 @@ build_rust_libraries() {
     ensure_target "x86_64-apple-ios"
     ensure_target "aarch64-apple-ios-sim"
 
-    cargo build --lib --release --features uniffi --target aarch64-apple-ios -p erc7730
-    cargo build --lib --release --features uniffi --target x86_64-apple-ios -p erc7730
-    cargo build --lib --release --features uniffi --target aarch64-apple-ios-sim -p erc7730
+    cargo build --lib --release --features uniffi,github-registry --target aarch64-apple-ios -p erc7730
+    cargo build --lib --release --features uniffi,github-registry --target x86_64-apple-ios -p erc7730
+    cargo build --lib --release --features uniffi,github-registry --target aarch64-apple-ios-sim -p erc7730
 
-    cargo build --release --features uniffi -p erc7730
+    cargo build --release --features uniffi,github-registry -p erc7730
 }
 
 generate_swift_bindings() {
@@ -46,7 +46,7 @@ generate_swift_bindings() {
         exit 1
     fi
 
-    cargo run -p erc7730 --features uniffi --bin uniffi-bindgen -- generate \
+    cargo run -p erc7730 --features uniffi,github-registry --bin uniffi-bindgen -- generate \
         --library "$host_library" \
         --language swift \
         --out-dir "$STAGING_DIR"

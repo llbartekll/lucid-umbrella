@@ -14,7 +14,7 @@ UniFFI bindings (Kotlin + Swift) are implemented in the same crate via a statele
 
 ```sh
 cargo build          # Build
-cargo test           # Run default tests (34 unit + 12 integration)
+cargo test           # Run default tests (34 unit + 13 integration)
 cargo clippy         # Lint
 cargo fmt --check    # Format check
 ```
@@ -22,9 +22,9 @@ cargo fmt --check    # Format check
 UniFFI checks and binding generation:
 
 ```sh
-cargo check -p erc7730 --features uniffi
-cargo test -p erc7730 --features uniffi     # 41 unit tests + 12 integration
-cargo clippy -p erc7730 --all-targets --features uniffi -- -D warnings
+cargo check -p erc7730 --features uniffi,github-registry
+cargo test -p erc7730 --features uniffi,github-registry     # 42 unit tests + 13 integration
+cargo clippy -p erc7730 --all-targets --features uniffi,github-registry -- -D warnings
 ./scripts/generate_uniffi_bindings.sh
 ./scripts/build-xcframework.sh
 swift package resolve
@@ -55,15 +55,19 @@ Repository policy:
 
 ## Public API
 
-Four entry points, all in `lib.rs`:
-- `format(chain_id, to, calldata, value, source, tokens)` — high-level: resolves descriptor then formats
+Six entry points, all in `lib.rs`:
+- `format(chain_id, to, calldata, value, source, tokens)` — high-level: resolves descriptor then formats (graceful degradation on NotFound)
+- `format_with_from(chain_id, to, calldata, value, from, source, tokens)` — high-level with `@.from` support
+- `format_typed(data, source, tokens)` — high-level: resolves descriptor then formats EIP-712 typed data (graceful degradation on NotFound)
 - `format_calldata(descriptor, chain_id, to, calldata, value, tokens)` — low-level: format with pre-resolved descriptor
-- `format_calldata_with_from(descriptor, chain_id, to, calldata, value, from, tokens)` — with `@.from` container value support
-- `format_typed_data(descriptor, data, tokens)` — EIP-712 typed data formatting
+- `format_calldata_with_from(descriptor, chain_id, to, calldata, value, from, tokens)` — low-level with `@.from` container value support
+- `format_typed_data(descriptor, data, tokens)` — low-level EIP-712 typed data formatting
 
 UniFFI FFI exports in `src/uniffi_compat/mod.rs`:
-- `erc7730_format_calldata(descriptor_json, chain_id, to, calldata_hex, value_hex, from_address, tokens)`
-- `erc7730_format_typed_data(descriptor_json, typed_data_json, tokens)`
+- `erc7730_format(chain_id, to, calldata_hex, value_hex, from_address, tokens)` — high-level with GitHub registry resolution (requires `github-registry` feature)
+- `erc7730_format_typed(typed_data_json, tokens)` — high-level EIP-712 with GitHub registry resolution (requires `github-registry` feature)
+- `erc7730_format_calldata(descriptor_json, chain_id, to, calldata_hex, value_hex, from_address, tokens)` — low-level
+- `erc7730_format_typed_data(descriptor_json, typed_data_json, tokens)` — low-level
 
 Local Swift package product:
 - `Erc7730` (binary target + Swift wrapper target)
@@ -97,6 +101,9 @@ The library supports v2 registry descriptor features:
 
 Optional features:
 - `github-registry`: HTTP-based descriptor fetching via `GitHubRegistrySource` (adds `ureq` dependency)
+  - `GitHubRegistrySource::from_registry(base_url)` fetches `index.json` mapping `{chain_id}:{address}` → relative file path
+  - Default registry: `https://github.com/llbartekll/7730-v2-registry` (v2 descriptors, index.json at root)
+  - Registry source is cached via `OnceLock` in FFI layer — index fetched once per process
 
 ## Pending
 

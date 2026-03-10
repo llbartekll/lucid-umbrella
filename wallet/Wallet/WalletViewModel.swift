@@ -237,21 +237,25 @@ final class WalletViewModel {
 
         log.info("Processing tx: to=\(tx.to) chainId=\(chainId) calldata=\((tx.data ?? "0x").prefix(10))...")
         let calldata = tx.data ?? "0x"
-        let result = clearSigning.formatCalldata(
-            chainId: chainId,
-            to: tx.to,
-            calldata: calldata,
-            value: tx.value,
-            from: tx.from
-        )
 
-        switch result {
-        case .success(let model):
-            log.info("Clear signing OK: intent=\(model.intent) entries=\(model.entries.count)")
-            displayModel = model
-        case .failure(let error):
-            log.error("Clear signing failed: \(error)")
-            requestError = error.localizedDescription
+        Task {
+            let result = clearSigning.formatCalldata(
+                chainId: chainId,
+                to: tx.to,
+                calldata: calldata,
+                value: tx.value,
+                from: tx.from
+            )
+            await MainActor.run {
+                switch result {
+                case .success(let model):
+                    log.info("Clear signing OK: intent=\(model.intent) entries=\(model.entries.count)")
+                    displayModel = model
+                case .failure(let error):
+                    log.error("Clear signing failed: \(error)")
+                    requestError = error.localizedDescription
+                }
+            }
         }
     }
 
@@ -266,12 +270,16 @@ final class WalletViewModel {
         let typedDataJson = paramsArray[1]
         rawRequestJSON = typedDataJson
 
-        let result = clearSigning.formatTypedData(typedDataJson: typedDataJson)
-        switch result {
-        case .success(let model):
-            displayModel = model
-        case .failure(let error):
-            requestError = error.localizedDescription
+        Task {
+            let result = clearSigning.formatTypedData(typedDataJson: typedDataJson)
+            await MainActor.run {
+                switch result {
+                case .success(let model):
+                    displayModel = model
+                case .failure(let error):
+                    requestError = error.localizedDescription
+                }
+            }
         }
     }
 

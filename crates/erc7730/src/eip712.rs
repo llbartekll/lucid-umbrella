@@ -62,16 +62,12 @@ pub fn format_typed_data(
     let chain_id = data.domain.chain_id.unwrap_or(1);
 
     // Find format by primary type name
-    let format = descriptor
-        .display
-        .formats
-        .get(&data.primary_type)
-        .ok_or_else(|| {
-            Error::Render(format!(
-                "no display format found for primary type '{}'",
-                data.primary_type
-            ))
-        })?;
+    let format = descriptor.display.formats.get(&data.primary_type);
+
+    // Graceful fallback: if no format matches, show raw message fields
+    let Some(format) = format else {
+        return Ok(build_typed_raw_fallback(data));
+    };
 
     let mut warnings = Vec::new();
     let entries = render_typed_fields(
@@ -222,6 +218,41 @@ fn render_typed_field_group(
         iteration,
         items,
     }))
+}
+
+/// Build a raw fallback DisplayModel for EIP-712 typed data when no format matches.
+pub(crate) fn build_typed_raw_fallback(data: &TypedData) -> DisplayModel {
+    let mut entries = Vec::new();
+
+    // Use the primary type's field definitions to order entries if available
+    if let Some(type_fields) = data.types.get(&data.primary_type) {
+        for field in type_fields {
+            let value = data
+                .message
+                .get(&field.name)
+                .map(json_value_to_string)
+                .unwrap_or_else(|| "<missing>".to_string());
+            entries.push(DisplayEntry::Item(DisplayItem {
+                label: field.name.clone(),
+                value,
+            }));
+        }
+    } else if let Some(obj) = data.message.as_object() {
+        // Fallback: iterate message keys
+        for (key, val) in obj {
+            entries.push(DisplayEntry::Item(DisplayItem {
+                label: key.clone(),
+                value: json_value_to_string(val),
+            }));
+        }
+    }
+
+    DisplayModel {
+        intent: data.primary_type.clone(),
+        interpolated_intent: None,
+        entries,
+        warnings: vec!["No matching descriptor format found".to_string()],
+    }
 }
 
 /// Resolve a path in EIP-712 message JSON (e.g., "recipient" or "details.amount").
@@ -560,5 +591,105 @@ mod tests {
         assert_eq!(json_value_to_string(&serde_json::json!("hello")), "hello");
         assert_eq!(json_value_to_string(&serde_json::json!(42)), "42");
         assert_eq!(json_value_to_string(&serde_json::json!(true)), "true");
+    }
+
+    #[test]
+    fn test_permit_graceful_fallback() {
+        // Real USDC Permit typed data from wallet — no descriptor format for "Permit"
+        let typed_data_json = r#"{
+            "types": {
+                "EIP712Domain": [
+                    {"name":"name","type":"string"},
+                    {"name":"version","type":"string"},
+                    {"name":"chainId","type":"uint256"},
+                    {"name":"verifyingContract","type":"address"}
+                ],
+                "Permit": [
+                    {"name":"owner","type":"address"},
+                    {"name":"spender","type":"address"},
+                    {"name":"value","type":"uint256"},
+                    {"name":"nonce","type":"uint256"},
+                    {"name":"deadline","type":"uint256"}
+                ]
+            },
+            "primaryType": "Permit",
+            "domain": {
+                "name": "USD Coin",
+                "version": "2",
+                "chainId": 1,
+                "verifyingContract": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+            },
+            "message": {
+                "owner": "0xbf01daf454dce008d3e2bfd47d5e186f71477253",
+                "spender": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+                "value": "100000",
+                "nonce": 0,
+                "deadline": "1773156895"
+            }
+        }"#;
+
+        let typed_data: TypedData = serde_json::from_str(typed_data_json).unwrap();
+
+        // Empty descriptor — no formats at all
+        let descriptor_json = r#"{
+            "context": {
+                "eip712": {
+                    "deployments": [
+                        {"chainId": 1, "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"}
+                    ]
+                }
+            },
+            "metadata": {
+                "owner": "test",
+                "enums": {},
+                "constants": {},
+                "addressBook": {},
+                "maps": {}
+            },
+            "display": {
+                "definitions": {},
+                "formats": {}
+            }
+        }"#;
+
+        let descriptor = Descriptor::from_json(descriptor_json).unwrap();
+        let token_source = crate::token::EmptyTokenSource;
+
+        let result = format_typed_data(&descriptor, &typed_data, &token_source).unwrap();
+
+        assert_eq!(result.intent, "Permit");
+        assert!(!result.warnings.is_empty());
+        assert!(result.warnings[0].contains("No matching descriptor format found"));
+
+        // Should have all 5 fields from the Permit type, in order
+        assert_eq!(result.entries.len(), 5);
+
+        if let DisplayEntry::Item(ref item) = result.entries[0] {
+            assert_eq!(item.label, "owner");
+            assert_eq!(item.value, "0xbf01daf454dce008d3e2bfd47d5e186f71477253");
+        } else {
+            panic!("expected Item");
+        }
+
+        if let DisplayEntry::Item(ref item) = result.entries[1] {
+            assert_eq!(item.label, "spender");
+            assert_eq!(item.value, "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2");
+        } else {
+            panic!("expected Item");
+        }
+
+        if let DisplayEntry::Item(ref item) = result.entries[2] {
+            assert_eq!(item.label, "value");
+            assert_eq!(item.value, "100000");
+        } else {
+            panic!("expected Item");
+        }
+
+        if let DisplayEntry::Item(ref item) = result.entries[4] {
+            assert_eq!(item.label, "deadline");
+            assert_eq!(item.value, "1773156895");
+        } else {
+            panic!("expected Item");
+        }
     }
 }

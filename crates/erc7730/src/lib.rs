@@ -202,6 +202,8 @@ pub fn format_typed_data(
 }
 
 /// High-level convenience: resolve descriptor then format calldata.
+///
+/// Gracefully degrades to raw preview when no descriptor is found.
 pub fn format(
     chain_id: u64,
     to: &str,
@@ -210,16 +212,69 @@ pub fn format(
     source: &dyn DescriptorSource,
     tokens: &dyn TokenSource,
 ) -> Result<DisplayModel, Error> {
-    let resolved = source.resolve_calldata(chain_id, to)?;
-    format_calldata_with_from(
-        &resolved.descriptor,
-        chain_id,
-        to,
-        calldata,
-        value,
-        None,
-        tokens,
-    )
+    match source.resolve_calldata(chain_id, to) {
+        Ok(resolved) => format_calldata_with_from(
+            &resolved.descriptor,
+            chain_id,
+            to,
+            calldata,
+            value,
+            None,
+            tokens,
+        ),
+        Err(error::ResolveError::NotFound { .. }) => Ok(build_raw_fallback(calldata)),
+        Err(e) => Err(Error::Resolve(e)),
+    }
+}
+
+/// High-level convenience: resolve descriptor then format calldata (with from address).
+///
+/// Gracefully degrades to raw preview when no descriptor is found.
+pub fn format_with_from(
+    chain_id: u64,
+    to: &str,
+    calldata: &[u8],
+    value: Option<&[u8]>,
+    from: Option<&str>,
+    source: &dyn DescriptorSource,
+    tokens: &dyn TokenSource,
+) -> Result<DisplayModel, Error> {
+    match source.resolve_calldata(chain_id, to) {
+        Ok(resolved) => format_calldata_with_from(
+            &resolved.descriptor,
+            chain_id,
+            to,
+            calldata,
+            value,
+            from,
+            tokens,
+        ),
+        Err(error::ResolveError::NotFound { .. }) => Ok(build_raw_fallback(calldata)),
+        Err(e) => Err(Error::Resolve(e)),
+    }
+}
+
+/// High-level convenience: resolve descriptor then format EIP-712 typed data.
+///
+/// Gracefully degrades to raw preview when no descriptor is found.
+pub fn format_typed(
+    data: &eip712::TypedData,
+    source: &dyn DescriptorSource,
+    tokens: &dyn TokenSource,
+) -> Result<DisplayModel, Error> {
+    let chain_id = data.domain.chain_id.unwrap_or(1);
+    let address = data
+        .domain
+        .verifying_contract
+        .as_deref()
+        .unwrap_or("0x0000000000000000000000000000000000000000");
+    match source.resolve_typed(chain_id, address) {
+        Ok(resolved) => format_typed_data(&resolved.descriptor, data, tokens),
+        Err(error::ResolveError::NotFound { .. }) => {
+            Ok(eip712::build_typed_raw_fallback(data))
+        }
+        Err(e) => Err(Error::Resolve(e)),
+    }
 }
 
 /// Find a format key whose signature matches the calldata selector.

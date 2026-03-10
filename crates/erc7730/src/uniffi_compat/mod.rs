@@ -7,6 +7,35 @@ use crate::{
     DisplayModel,
 };
 
+#[cfg(feature = "github-registry")]
+use std::sync::OnceLock;
+
+#[cfg(feature = "github-registry")]
+use crate::resolver::GitHubRegistrySource;
+
+#[cfg(feature = "github-registry")]
+use crate::token::{CompositeTokenSource, WellKnownTokenSource};
+
+#[cfg(feature = "github-registry")]
+const DEFAULT_REGISTRY_URL: &str =
+    "https://raw.githubusercontent.com/llbartekll/7730-v2-registry/main";
+
+#[cfg(feature = "github-registry")]
+static REGISTRY_SOURCE: OnceLock<Result<GitHubRegistrySource, String>> = OnceLock::new();
+
+#[cfg(feature = "github-registry")]
+fn get_registry_source() -> Result<&'static GitHubRegistrySource, FfiError> {
+    let result = REGISTRY_SOURCE.get_or_init(|| {
+        GitHubRegistrySource::from_registry(DEFAULT_REGISTRY_URL).map_err(|e| e.to_string())
+    });
+    match result {
+        Ok(source) => Ok(source),
+        Err(e) => Err(FfiError::Resolve(format!(
+            "failed to initialize registry: {e}"
+        ))),
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct TokenMetaInput {
     pub chain_id: u64,
@@ -60,16 +89,44 @@ pub fn erc7730_format_calldata(
     from_address: Option<String>,
     tokens: Vec<TokenMetaInput>,
 ) -> Result<DisplayModel, FfiError> {
-    let descriptor = Descriptor::from_json(&descriptor_json)
-        .map_err(|err| FfiError::InvalidDescriptorJson(err.to_string()))?;
+    println!("[erc7730] format_calldata called");
+    println!("[erc7730]   chain_id={}", chain_id);
+    println!("[erc7730]   to={}", to);
+    println!("[erc7730]   calldata_hex={}", &calldata_hex[..std::cmp::min(20, calldata_hex.len())]);
+    println!("[erc7730]   value_hex={:?}", value_hex);
+    println!("[erc7730]   from_address={:?}", from_address);
+    println!("[erc7730]   tokens count={}", tokens.len());
+    println!("[erc7730]   descriptor_json length={}", descriptor_json.len());
+
+    let descriptor = match Descriptor::from_json(&descriptor_json) {
+        Ok(d) => {
+            println!("[erc7730]   descriptor parsed OK");
+            println!("[erc7730]   format keys: {:?}", d.display.formats.keys().collect::<Vec<_>>());
+            println!("[erc7730]   context is_contract={} deployments={:?}",
+                d.context.is_contract(),
+                d.context.deployments());
+            d
+        }
+        Err(err) => {
+            println!("[erc7730]   descriptor parse FAILED: {}", err);
+            return Err(FfiError::InvalidDescriptorJson(err.to_string()));
+        }
+    };
+
     let calldata = decode_hex(&calldata_hex, HexContext::Calldata)?;
+    println!("[erc7730]   calldata decoded, {} bytes", calldata.len());
+    if calldata.len() >= 4 {
+        println!("[erc7730]   selector=0x{}", hex::encode(&calldata[..4]));
+    }
+
     let value = match value_hex {
         Some(hex_value) => Some(decode_hex(&hex_value, HexContext::Value)?),
         None => None,
     };
+    println!("[erc7730]   value decoded, {} bytes", value.as_ref().map_or(0, |v| v.len()));
 
     let token_source = build_token_source(&tokens);
-    crate::format_calldata_with_from(
+    let result = crate::format_calldata_with_from(
         &descriptor,
         chain_id,
         &to,
@@ -77,8 +134,25 @@ pub fn erc7730_format_calldata(
         value.as_deref(),
         from_address.as_deref(),
         &token_source,
-    )
-    .map_err(Into::into)
+    );
+
+    match &result {
+        Ok(model) => {
+            println!("[erc7730]   format OK: intent={}", model.intent);
+            println!("[erc7730]   entries count={}", model.entries.len());
+            if let Some(ref interp) = model.interpolated_intent {
+                println!("[erc7730]   interpolated_intent={}", interp);
+            }
+            if !model.warnings.is_empty() {
+                println!("[erc7730]   warnings={:?}", model.warnings);
+            }
+        }
+        Err(err) => {
+            println!("[erc7730]   format FAILED: {}", err);
+        }
+    }
+
+    result.map_err(Into::into)
 }
 
 #[uniffi::export]
@@ -87,13 +161,158 @@ pub fn erc7730_format_typed_data(
     typed_data_json: String,
     tokens: Vec<TokenMetaInput>,
 ) -> Result<DisplayModel, FfiError> {
-    let descriptor = Descriptor::from_json(&descriptor_json)
-        .map_err(|err| FfiError::InvalidDescriptorJson(err.to_string()))?;
-    let typed_data: TypedData = serde_json::from_str(&typed_data_json)
-        .map_err(|err| FfiError::InvalidTypedDataJson(err.to_string()))?;
+    println!("[erc7730] format_typed_data called");
+    println!("[erc7730]   descriptor_json length={}", descriptor_json.len());
+    println!("[erc7730]   typed_data_json length={}", typed_data_json.len());
+    println!("[erc7730]   tokens count={}", tokens.len());
+
+    let descriptor = match Descriptor::from_json(&descriptor_json) {
+        Ok(d) => {
+            println!("[erc7730]   descriptor parsed OK");
+            println!("[erc7730]   format keys: {:?}", d.display.formats.keys().collect::<Vec<_>>());
+            d
+        }
+        Err(err) => {
+            println!("[erc7730]   descriptor parse FAILED: {}", err);
+            return Err(FfiError::InvalidDescriptorJson(err.to_string()));
+        }
+    };
+
+    let typed_data: TypedData = match serde_json::from_str::<TypedData>(&typed_data_json) {
+        Ok(td) => {
+            println!("[erc7730]   typed_data parsed OK, primaryType={}", td.primary_type);
+            println!("[erc7730]   domain: name={:?} chainId={:?} verifyingContract={:?}",
+                td.domain.name, td.domain.chain_id, td.domain.verifying_contract);
+            td
+        }
+        Err(err) => {
+            println!("[erc7730]   typed_data parse FAILED: {}", err);
+            return Err(FfiError::InvalidTypedDataJson(err.to_string()));
+        }
+    };
 
     let token_source = build_token_source(&tokens);
-    format_typed_data(&descriptor, &typed_data, &token_source).map_err(Into::into)
+    let result = format_typed_data(&descriptor, &typed_data, &token_source);
+
+    match &result {
+        Ok(model) => {
+            println!("[erc7730]   format OK: intent={}", model.intent);
+            println!("[erc7730]   entries count={}", model.entries.len());
+            if !model.warnings.is_empty() {
+                println!("[erc7730]   warnings={:?}", model.warnings);
+            }
+        }
+        Err(err) => {
+            println!("[erc7730]   format FAILED: {}", err);
+        }
+    }
+
+    result.map_err(Into::into)
+}
+
+/// High-level: resolve descriptor from GitHub registry, then format calldata.
+///
+/// Requires the `github-registry` feature.
+#[cfg(feature = "github-registry")]
+#[uniffi::export]
+pub fn erc7730_format(
+    chain_id: u64,
+    to: String,
+    calldata_hex: String,
+    value_hex: Option<String>,
+    from_address: Option<String>,
+    tokens: Vec<TokenMetaInput>,
+) -> Result<DisplayModel, FfiError> {
+    println!("[erc7730] format called (high-level, registry)");
+    println!("[erc7730]   chain_id={}", chain_id);
+    println!("[erc7730]   to={}", to);
+    println!(
+        "[erc7730]   calldata_hex={}",
+        &calldata_hex[..std::cmp::min(20, calldata_hex.len())]
+    );
+
+    let source = get_registry_source()?;
+    let calldata = decode_hex(&calldata_hex, HexContext::Calldata)?;
+    let value = match value_hex {
+        Some(hex_value) => Some(decode_hex(&hex_value, HexContext::Value)?),
+        None => None,
+    };
+
+    let caller_tokens = build_token_source(&tokens);
+    let well_known = WellKnownTokenSource::new();
+    let composite = CompositeTokenSource::new(vec![
+        Box::new(caller_tokens),
+        Box::new(well_known),
+    ]);
+
+    let result = crate::format_with_from(
+        chain_id,
+        &to,
+        &calldata,
+        value.as_deref(),
+        from_address.as_deref(),
+        source,
+        &composite,
+    );
+
+    match &result {
+        Ok(model) => {
+            println!("[erc7730]   format OK: intent={}", model.intent);
+            println!("[erc7730]   entries count={}", model.entries.len());
+        }
+        Err(err) => {
+            println!("[erc7730]   format FAILED: {}", err);
+        }
+    }
+
+    result.map_err(Into::into)
+}
+
+/// High-level: resolve descriptor from GitHub registry, then format EIP-712 typed data.
+///
+/// Requires the `github-registry` feature.
+#[cfg(feature = "github-registry")]
+#[uniffi::export]
+pub fn erc7730_format_typed(
+    typed_data_json: String,
+    tokens: Vec<TokenMetaInput>,
+) -> Result<DisplayModel, FfiError> {
+    println!("[erc7730] format_typed called (high-level, registry)");
+    println!(
+        "[erc7730]   typed_data_json length={}",
+        typed_data_json.len()
+    );
+
+    let typed_data: TypedData = serde_json::from_str::<TypedData>(&typed_data_json)
+        .map_err(|e| FfiError::InvalidTypedDataJson(e.to_string()))?;
+
+    println!(
+        "[erc7730]   primaryType={} verifyingContract={:?}",
+        typed_data.primary_type, typed_data.domain.verifying_contract
+    );
+
+    let source = get_registry_source()?;
+
+    let caller_tokens = build_token_source(&tokens);
+    let well_known = WellKnownTokenSource::new();
+    let composite = CompositeTokenSource::new(vec![
+        Box::new(caller_tokens),
+        Box::new(well_known),
+    ]);
+
+    let result = crate::format_typed(&typed_data, source, &composite);
+
+    match &result {
+        Ok(model) => {
+            println!("[erc7730]   format OK: intent={}", model.intent);
+            println!("[erc7730]   entries count={}", model.entries.len());
+        }
+        Err(err) => {
+            println!("[erc7730]   format FAILED: {}", err);
+        }
+    }
+
+    result.map_err(Into::into)
 }
 
 enum HexContext {
@@ -108,7 +327,16 @@ fn decode_hex(input: &str, context: HexContext) -> Result<Vec<u8>, FfiError> {
         .or_else(|| trimmed.strip_prefix("0X"))
         .unwrap_or(trimmed);
 
-    hex::decode(normalized).map_err(|err| match context {
+    // Pad odd-length hex strings with a leading zero (e.g. "0x0" → "00")
+    let padded;
+    let hex_str = if normalized.len() % 2 != 0 {
+        padded = format!("0{}", normalized);
+        &padded
+    } else {
+        normalized
+    };
+
+    hex::decode(hex_str).map_err(|err| match context {
         HexContext::Calldata => FfiError::InvalidCalldataHex(err.to_string()),
         HexContext::Value => FfiError::InvalidValueHex(err.to_string()),
     })

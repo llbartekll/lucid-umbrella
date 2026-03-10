@@ -489,6 +489,45 @@ fn graceful_fallback_unknown_selector() {
     assert!(result.warnings[0].contains("No matching descriptor format found"));
 }
 
+// --- L2 encoded withdraw(bytes32) on Optimism ---
+// Real wallet data: Aave V3 Pool on Optimism uses L2-encoded functions
+// where params are packed into a single bytes32 instead of separate args.
+// The descriptor only has withdraw(address,uint256,address) (selector 0x69328dec),
+// so the L2 variant withdraw(bytes32) (selector 0x8e19899e) falls back to raw preview.
+#[test]
+fn aave_withdraw_bytes32_optimism_graceful_fallback() {
+    let descriptor = load_descriptor("aave-lpv3.json");
+    let tokens = aave_token_source();
+
+    // Exact calldata from wallet: withdraw(bytes32) on Optimism chain 10
+    let calldata = hex::decode(
+        "8e19899e0000000000000000000000000000ffffffffffffffffffffffffffffffff0005",
+    )
+    .unwrap();
+
+    let result = format_calldata_with_from(
+        &descriptor,
+        10,
+        "0x794a61358d6845594f94dc1db02a252b5b4814ad",
+        &calldata,
+        Some(&[0x00]),
+        Some("0xbf01daf454dce008d3e2bfd47d5e186f71477253"),
+        &tokens,
+    )
+    .unwrap();
+
+    // No format key matches selector 0x8e19899e, so we get graceful fallback
+    assert!(
+        result.intent.contains("0x8e19899e"),
+        "should fall back to unknown function: {}",
+        result.intent
+    );
+    assert!(!result.warnings.is_empty());
+    assert!(result.warnings[0].contains("No matching descriptor format found"));
+    // The single bytes32 arg should appear as a raw param
+    assert_eq!(result.entries.len(), 1);
+}
+
 // --- FilesystemSource Test ---
 
 #[test]
