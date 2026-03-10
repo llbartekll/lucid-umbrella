@@ -39,13 +39,23 @@ actor WalletConnectService {
     }
 
     func approveProposal(_ proposal: Session.Proposal, address: String) async throws {
-        let account = Account(blockchain: Blockchain("eip155:1")!, address: address)!
+        let supportedMethods = Set(proposal.requiredNamespaces.flatMap { $0.value.methods } +
+                                   (proposal.optionalNamespaces?.flatMap { $0.value.methods } ?? []))
+        let supportedEvents = Set(proposal.requiredNamespaces.flatMap { $0.value.events } +
+                                  (proposal.optionalNamespaces?.flatMap { $0.value.events } ?? []))
+
+        let supportedRequiredChains = proposal.requiredNamespaces["eip155"]?.chains ?? []
+        let supportedOptionalChains = proposal.optionalNamespaces?["eip155"]?.chains ?? []
+        let supportedChains = supportedRequiredChains + supportedOptionalChains
+
+        let accounts = supportedChains.map { Account(blockchain: $0, address: address)! }
+
         let namespaces = try AutoNamespaces.build(
             sessionProposal: proposal,
-            chains: [Blockchain("eip155:1")!],
-            methods: ["eth_sendTransaction", "eth_signTypedData", "eth_signTypedData_v4", "personal_sign", "eth_sign"],
-            events: ["chainChanged", "accountsChanged"],
-            accounts: [account]
+            chains: supportedChains,
+            methods: Array(supportedMethods),
+            events: Array(supportedEvents),
+            accounts: accounts
         )
         _ = try await WalletKit.instance.approve(proposalId: proposal.id, namespaces: namespaces)
     }
