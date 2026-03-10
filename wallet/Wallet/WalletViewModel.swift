@@ -53,7 +53,7 @@ final class WalletViewModel {
         keyError = nil
         do {
             let km = try KeyManager(privateKeyHex: privateKeyHex)
-            km.save()
+            try km.save()
             keyManager = km
             ethereumAddress = km.ethereumAddress
             privateKeyHex = ""

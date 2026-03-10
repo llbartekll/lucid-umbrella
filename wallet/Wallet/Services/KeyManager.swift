@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import secp256k1
 
 struct KeyManager {
@@ -24,27 +25,75 @@ struct KeyManager {
         self.ethereumAddress = address
     }
 
-    func save() {
-        UserDefaults.standard.set(privateKeyHex, forKey: Self.storageKey)
+    func save() throws {
+        try Self.storeKeychainValue(privateKeyHex)
     }
 
     static func restore() -> KeyManager? {
-        guard let hex = UserDefaults.standard.string(forKey: storageKey) else { return nil }
-        return try? KeyManager(privateKeyHex: hex)
+        if let hex = readKeychainValue() {
+            return try? KeyManager(privateKeyHex: hex)
+        }
+        if let hex = UserDefaults.standard.string(forKey: storageKey) {
+            try? storeKeychainValue(hex)
+            UserDefaults.standard.removeObject(forKey: storageKey)
+            return try? KeyManager(privateKeyHex: hex)
+        }
+        return nil
     }
 
     static func clear() {
+        deleteKeychainValue()
         UserDefaults.standard.removeObject(forKey: storageKey)
     }
 }
 
 enum KeyError: LocalizedError {
     case invalidPrivateKey
+    case keychainSaveFailed(OSStatus)
 
     var errorDescription: String? {
         switch self {
         case .invalidPrivateKey: return "Invalid private key (expected 32 hex bytes)"
+        case .keychainSaveFailed(let status): return "Failed to store key in Keychain (OSStatus \(status))"
         }
+    }
+}
+
+// MARK: - Keychain
+
+extension KeyManager {
+    private static func baseKeychainQuery() -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.lucidumbrella.wallet",
+            kSecAttrAccount as String: storageKey,
+        ]
+    }
+
+    private static func storeKeychainValue(_ value: String) throws {
+        var query = baseKeychainQuery()
+        let data = Data(value.utf8)
+        SecItemDelete(query as CFDictionary)
+        query[kSecValueData as String] = data
+        query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else { throw KeyError.keychainSaveFailed(status) }
+    }
+
+    private static func readKeychainValue() -> String? {
+        var query = baseKeychainQuery()
+        query[kSecReturnData as String] = kCFBooleanTrue
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess, let data = item as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private static func deleteKeychainValue() {
+        let query = baseKeychainQuery()
+        SecItemDelete(query as CFDictionary)
     }
 }
 
