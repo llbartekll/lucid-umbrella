@@ -4,3 +4,4 @@
 /bindings/kotlin/
 /.build/
 /.swiftpm/
+wallet/Config.xcconfig

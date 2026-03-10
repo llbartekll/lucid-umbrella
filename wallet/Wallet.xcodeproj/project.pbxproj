@@ -10,6 +10,18 @@
 		C1000001233456780001 /* WalletApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001233456780011 /* WalletApp.swift */; };
 		C1000001233456780002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001233456780012 /* ContentView.swift */; };
 		C1000001233456780099 /* Erc7730 in Frameworks */ = {isa = PBXBuildFile; productRef = C1000001233456780098 /* Erc7730 */; };
+		D1000001000000000001 /* WalletViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1000001000000000011 /* WalletViewModel.swift */; };
+		D1000001000000000002 /* KeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1000001000000000012 /* KeyManager.swift */; };
+		D1000001000000000003 /* WalletConnectService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1000001000000000013 /* WalletConnectService.swift */; };
+		D1000001000000000004 /* ClearSigningService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1000001000000000014 /* ClearSigningService.swift */; };
+		D1000001000000000005 /* DisplayModelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1000001000000000015 /* DisplayModelView.swift */; };
+		D1000001000000000006 /* KeyImportSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1000001000000000016 /* KeyImportSection.swift */; };
+		D1000001000000000007 /* QRScannerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1000001000000000017 /* QRScannerSheet.swift */; };
+		D1000001000000000008 /* SessionProposalSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1000001000000000018 /* SessionProposalSheet.swift */; };
+		D1000001000000000009 /* SessionRequestSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1000001000000000019 /* SessionRequestSheet.swift */; };
+		D100000100000000000A /* ReownWalletKit in Frameworks */ = {isa = PBXBuildFile; productRef = D100000100000000000B /* ReownWalletKit */; };
+		D100000100000000000C /* secp256k1 in Frameworks */ = {isa = PBXBuildFile; productRef = D100000100000000000D /* secp256k1 */; };
+		D100000100000000000E /* CodeScanner in Frameworks */ = {isa = PBXBuildFile; productRef = D100000100000000000F /* CodeScanner */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -17,6 +29,16 @@
 		C1000001233456780011 /* WalletApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletApp.swift; sourceTree = "<group>"; };
 		C1000001233456780012 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		C1000001233456780013 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		D1000001000000000011 /* WalletViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletViewModel.swift; sourceTree = "<group>"; };
+		D1000001000000000012 /* KeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyManager.swift; sourceTree = "<group>"; };
+		D1000001000000000013 /* WalletConnectService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletConnectService.swift; sourceTree = "<group>"; };
+		D1000001000000000014 /* ClearSigningService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearSigningService.swift; sourceTree = "<group>"; };
+		D1000001000000000015 /* DisplayModelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayModelView.swift; sourceTree = "<group>"; };
+		D1000001000000000016 /* KeyImportSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyImportSection.swift; sourceTree = "<group>"; };
+		D1000001000000000017 /* QRScannerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerSheet.swift; sourceTree = "<group>"; };
+		D1000001000000000018 /* SessionProposalSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionProposalSheet.swift; sourceTree = "<group>"; };
+		D1000001000000000019 /* SessionRequestSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRequestSheet.swift; sourceTree = "<group>"; };
+		D1000001000000000040 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Config.xcconfig; path = Config.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -25,6 +47,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				C1000001233456780099 /* Erc7730 in Frameworks */,
+				D100000100000000000A /* ReownWalletKit in Frameworks */,
+				D100000100000000000C /* secp256k1 in Frameworks */,
+				D100000100000000000E /* CodeScanner in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -44,6 +69,9 @@
 			children = (
 				C1000001233456780011 /* WalletApp.swift */,
 				C1000001233456780012 /* ContentView.swift */,
+				D1000001000000000011 /* WalletViewModel.swift */,
+				D1000001000000000020 /* Services */,
+				D1000001000000000021 /* Views */,
 				C1000001233456780013 /* Info.plist */,
 			);
 			path = Wallet;
@@ -55,6 +83,28 @@
 				C1000001233456780010 /* Wallet.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		D1000001000000000020 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				D1000001000000000012 /* KeyManager.swift */,
+				D1000001000000000013 /* WalletConnectService.swift */,
+				D1000001000000000014 /* ClearSigningService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		D1000001000000000021 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				D1000001000000000015 /* DisplayModelView.swift */,
+				D1000001000000000016 /* KeyImportSection.swift */,
+				D1000001000000000017 /* QRScannerSheet.swift */,
+				D1000001000000000018 /* SessionProposalSheet.swift */,
+				D1000001000000000019 /* SessionRequestSheet.swift */,
+			);
+			path = Views;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -75,6 +125,9 @@
 			name = Wallet;
 			packageProductDependencies = (
 				C1000001233456780098 /* Erc7730 */,
+				D100000100000000000B /* ReownWalletKit */,
+				D100000100000000000D /* secp256k1 */,
+				D100000100000000000F /* CodeScanner */,
 			);
 			productName = Wallet;
 			productReference = C1000001233456780010 /* Wallet.app */;
@@ -106,6 +159,9 @@
 			mainGroup = C1000001233456780003;
 			packageReferences = (
 				C1000001233456780097 /* XCLocalSwiftPackageReference ".." */,
+				D1000001000000000030 /* XCRemoteSwiftPackageReference "reown-swift" */,
+				D1000001000000000031 /* XCRemoteSwiftPackageReference "swift-secp256k1" */,
+				D1000001000000000032 /* XCRemoteSwiftPackageReference "CodeScanner" */,
 			);
 			productRefGroup = C100000123345678000F /* Products */;
 			projectDirPath = "";
@@ -133,6 +189,15 @@
 			files = (
 				C1000001233456780001 /* WalletApp.swift in Sources */,
 				C1000001233456780002 /* ContentView.swift in Sources */,
+				D1000001000000000001 /* WalletViewModel.swift in Sources */,
+				D1000001000000000002 /* KeyManager.swift in Sources */,
+				D1000001000000000003 /* WalletConnectService.swift in Sources */,
+				D1000001000000000004 /* ClearSigningService.swift in Sources */,
+				D1000001000000000005 /* DisplayModelView.swift in Sources */,
+				D1000001000000000006 /* KeyImportSection.swift in Sources */,
+				D1000001000000000007 /* QRScannerSheet.swift in Sources */,
+				D1000001000000000008 /* SessionProposalSheet.swift in Sources */,
+				D1000001000000000009 /* SessionRequestSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -141,6 +206,7 @@
 /* Begin XCBuildConfiguration section */
 		C1000001233456780015 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = D1000001000000000040 /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
@@ -150,7 +216,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_OPTIMIZATION_LEVEL = 0;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
@@ -160,6 +226,7 @@
 		};
 		C1000001233456780016 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = D1000001000000000040 /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
@@ -169,7 +236,7 @@
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
@@ -248,11 +315,53 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		D1000001000000000030 /* XCRemoteSwiftPackageReference "reown-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/reown-com/reown-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+		D1000001000000000031 /* XCRemoteSwiftPackageReference "swift-secp256k1" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/21-DOT-DEV/swift-secp256k1";
+			requirement = {
+				kind = exactVersion;
+				version = 0.18.0;
+			};
+		};
+		D1000001000000000032 /* XCRemoteSwiftPackageReference "CodeScanner" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/twostraws/CodeScanner";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		C1000001233456780098 /* Erc7730 */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C1000001233456780097 /* XCLocalSwiftPackageReference ".." */;
 			productName = Erc7730;
+		};
+		D100000100000000000B /* ReownWalletKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D1000001000000000030 /* XCRemoteSwiftPackageReference "reown-swift" */;
+			productName = ReownWalletKit;
+		};
+		D100000100000000000D /* secp256k1 */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D1000001000000000031 /* XCRemoteSwiftPackageReference "swift-secp256k1" */;
+			productName = secp256k1;
+		};
+		D100000100000000000F /* CodeScanner */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D1000001000000000032 /* XCRemoteSwiftPackageReference "CodeScanner" */;
+			productName = CodeScanner;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

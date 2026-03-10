@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "Erc7730",
     platforms: [
-        .iOS(.v14)
+        .iOS(.v17)
     ],
     products: [
         .library(name: "Erc7730", targets: ["Erc7730"])

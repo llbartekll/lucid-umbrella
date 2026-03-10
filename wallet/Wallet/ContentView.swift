@@ -1,74 +1,108 @@
 import SwiftUI
-import Erc7730
+import ReownWalletKit
 
 struct ContentView: View {
-    @State private var status = "Tap to run smoke test"
+    @State private var viewModel = WalletViewModel()
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text("Wallet")
-                .font(.largeTitle)
+        NavigationStack {
+            Form {
+                KeyImportSection(viewModel: viewModel)
 
-            Text(status)
-                .font(.footnote)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Button("Run smoke test") {
-                runSmokeTest()
-            }
-        }
-        .padding()
-    }
-
-    private func runSmokeTest() {
-        let descriptorJson = #"""
-        {
-            "context": {
-                "contract": {
-                    "deployments": [
-                        { "chainId": 1, "address": "0xdac17f958d2ee523a2206206994597c13d831ec7" }
-                    ]
-                }
-            },
-            "metadata": {
-                "owner": "wallet-smoke-test",
-                "contractName": "Tether USD",
-                "enums": {},
-                "constants": {},
-                "addressBook": {},
-                "maps": {}
-            },
-            "display": {
-                "definitions": {},
-                "formats": {
-                    "transfer(address,uint256)": {
-                        "intent": "Transfer tokens",
-                        "fields": [
-                            { "path": "@.0", "label": "To", "format": "address" },
-                            { "path": "@.1", "label": "Amount", "format": "number" }
-                        ]
+                if viewModel.ethereumAddress != nil, viewModel.wcConfigured {
+                    walletConnectSection
+                    sessionsSection
+                } else if viewModel.ethereumAddress != nil, !viewModel.wcConfigured {
+                    Section("WalletConnect") {
+                        Text("WalletConnect not configured. Set WALLETCONNECT_PROJECT_ID in Config.xcconfig.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
+            .navigationTitle("Wallet")
+            .sheet(isPresented: $viewModel.showScanner) {
+                QRScannerSheet { code in
+                    viewModel.pairFromQR(code)
+                }
+            }
+            .sheet(isPresented: $viewModel.showProposal) {
+                if let proposal = viewModel.pendingProposal {
+                    SessionProposalSheet(
+                        proposal: proposal,
+                        onApprove: { viewModel.approveProposal() },
+                        onReject: { viewModel.rejectProposal() }
+                    )
+                }
+            }
+            .sheet(isPresented: $viewModel.showRequest) {
+                SessionRequestSheet(
+                    method: viewModel.pendingRequest?.method ?? "unknown",
+                    displayModel: viewModel.displayModel,
+                    error: viewModel.requestError,
+                    rawJSON: viewModel.rawRequestJSON,
+                    onReject: { viewModel.rejectRequest() }
+                )
+            }
+            .onAppear {
+                viewModel.configureWalletConnect()
+            }
         }
-        """#
+    }
 
-        let calldataHex = "a9059cbb000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000003e8"
-        let to = "0xdac17f958d2ee523a2206206994597c13d831ec7"
+    // MARK: - Sections
 
-        do {
-            let model = try erc7730FormatCalldata(
-                descriptorJson: descriptorJson,
-                chainId: 1,
-                to: to,
-                calldataHex: calldataHex,
-                valueHex: nil,
-                tokens: []
-            )
-            status = "OK: \(model.intent) | entries=\(model.entries.count)"
-        } catch {
-            status = "Error: \(error.localizedDescription)"
+    private var walletConnectSection: some View {
+        Section("WalletConnect") {
+            TextField("Paste WC URI", text: $viewModel.pairingURI)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .font(.caption.monospaced())
+
+            HStack {
+                Button("Pair") { viewModel.pair() }
+                    .disabled(viewModel.pairingURI.isEmpty)
+
+                Spacer()
+
+                Button {
+                    viewModel.showScanner = true
+                } label: {
+                    Label("Scan QR", systemImage: "qrcode.viewfinder")
+                }
+            }
+
+            if viewModel.isPaired {
+                Label("Paired", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .font(.caption)
+            }
+
+            if let error = viewModel.pairingError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private var sessionsSection: some View {
+        Section("Active Sessions") {
+            if viewModel.activeSessions.isEmpty {
+                Text("No active sessions")
+                    .foregroundStyle(.secondary)
+                    .font(.footnote)
+            } else {
+                ForEach(viewModel.activeSessions, id: \.topic) { session in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(session.peer.name)
+                            .font(.subheadline)
+                        Text(session.peer.url)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         }
     }
 }

@@ -23,6 +23,10 @@
         <key>UIApplicationSupportsMultipleScenes</key>
         <false/>
     </dict>
+    <key>NSCameraUsageDescription</key>
+    <string>Camera is used to scan WalletConnect QR codes</string>
+    <key>WalletConnectProjectID</key>
+    <string>$(WALLETCONNECT_PROJECT_ID)</string>
     <key>UILaunchScreen</key>
     <dict/>
 </dict>
