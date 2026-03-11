@@ -650,7 +650,11 @@ fn native_token_meta(chain_id: u64) -> crate::token::TokenMeta {
     }
 }
 
-fn format_amount(ctx: &RenderContext<'_>, val: &ArgumentValue, path: &str) -> Result<String, Error> {
+fn format_amount(
+    ctx: &RenderContext<'_>,
+    val: &ArgumentValue,
+    path: &str,
+) -> Result<String, Error> {
     match val {
         ArgumentValue::Uint(bytes) | ArgumentValue::Int(bytes) => {
             let n = BigUint::from_bytes_be(bytes);
@@ -762,11 +766,7 @@ pub(crate) fn format_with_decimals(amount: &BigUint, decimals: u8) -> String {
 /// Supports both v1 `${path}` and v2 `{paramName}` interpolation patterns.
 /// When `fields` contains a matching `DisplayField::Simple` with a stateless format
 /// (Date, Number, Address), uses that formatter instead of raw formatting.
-fn interpolate_intent(
-    template: &str,
-    ctx: &RenderContext<'_>,
-    fields: &[DisplayField],
-) -> String {
+fn interpolate_intent(template: &str, ctx: &RenderContext<'_>, fields: &[DisplayField]) -> String {
     let mut result = template.to_string();
 
     // First pass: replace ${path} patterns (v1)

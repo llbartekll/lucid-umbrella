@@ -22,7 +22,7 @@ impl TokenLookupKey {
 }
 
 /// Trait for token metadata providers.
-pub trait TokenSource {
+pub trait TokenSource: Send + Sync {
     fn lookup(&self, key: &TokenLookupKey) -> Option<TokenMeta>;
 }
 
@@ -81,11 +81,11 @@ struct WellKnownEntry {
 
 /// Composite token source that chains multiple sources, returning the first match.
 pub struct CompositeTokenSource {
-    sources: Vec<Box<dyn TokenSource>>,
+    sources: Vec<Box<dyn TokenSource + Send + Sync>>,
 }
 
 impl CompositeTokenSource {
-    pub fn new(sources: Vec<Box<dyn TokenSource>>) -> Self {
+    pub fn new(sources: Vec<Box<dyn TokenSource + Send + Sync>>) -> Self {
         Self { sources }
     }
 }

@@ -100,10 +100,11 @@ The library supports v2 registry descriptor features:
 - **`duration`/`unit` formatters**: Seconds → human-readable, numeric + unit symbol
 
 Optional features:
-- `github-registry`: HTTP-based descriptor fetching via `GitHubRegistrySource` (adds `ureq` dependency)
+- `github-registry`: async HTTP descriptor fetching via `GitHubRegistrySource` (adds `reqwest` dependency; requires tokio runtime)
   - `GitHubRegistrySource::from_registry(base_url)` fetches `index.json` mapping `{chain_id}:{address}` → relative file path
   - Default registry: `https://github.com/llbartekll/7730-v2-registry` (v2 descriptors, index.json at root)
-  - Registry source is cached via `OnceLock` in FFI layer — index fetched once per process
+  - Registry source is cached via `tokio::sync::OnceCell` in FFI layer — index fetched once per process
+  - UniFFI async exports use `#[uniffi::export(async_runtime = "tokio")]`; `uniffi` dep requires `features = ["tokio"]`
 
 ## Pending
 

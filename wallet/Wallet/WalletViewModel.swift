@@ -239,7 +239,7 @@ final class WalletViewModel {
         let calldata = tx.data ?? "0x"
 
         Task {
-            let result = clearSigning.formatCalldata(
+            let result = await clearSigning.formatCalldata(
                 chainId: chainId,
                 to: tx.to,
                 calldata: calldata,
@@ -271,7 +271,7 @@ final class WalletViewModel {
         rawRequestJSON = typedDataJson
 
         Task {
-            let result = clearSigning.formatTypedData(typedDataJson: typedDataJson)
+            let result = await clearSigning.formatTypedData(typedDataJson: typedDataJson)
             await MainActor.run {
                 switch result {
                 case .success(let model):

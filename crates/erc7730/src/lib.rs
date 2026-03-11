@@ -204,7 +204,7 @@ pub fn format_typed_data(
 /// High-level convenience: resolve descriptor then format calldata.
 ///
 /// Gracefully degrades to raw preview when no descriptor is found.
-pub fn format(
+pub async fn format(
     chain_id: u64,
     to: &str,
     calldata: &[u8],
@@ -212,7 +212,7 @@ pub fn format(
     source: &dyn DescriptorSource,
     tokens: &dyn TokenSource,
 ) -> Result<DisplayModel, Error> {
-    match source.resolve_calldata(chain_id, to) {
+    match source.resolve_calldata(chain_id, to).await {
         Ok(resolved) => format_calldata_with_from(
             &resolved.descriptor,
             chain_id,
@@ -230,7 +230,7 @@ pub fn format(
 /// High-level convenience: resolve descriptor then format calldata (with from address).
 ///
 /// Gracefully degrades to raw preview when no descriptor is found.
-pub fn format_with_from(
+pub async fn format_with_from(
     chain_id: u64,
     to: &str,
     calldata: &[u8],
@@ -239,7 +239,7 @@ pub fn format_with_from(
     source: &dyn DescriptorSource,
     tokens: &dyn TokenSource,
 ) -> Result<DisplayModel, Error> {
-    match source.resolve_calldata(chain_id, to) {
+    match source.resolve_calldata(chain_id, to).await {
         Ok(resolved) => format_calldata_with_from(
             &resolved.descriptor,
             chain_id,
@@ -257,7 +257,7 @@ pub fn format_with_from(
 /// High-level convenience: resolve descriptor then format EIP-712 typed data.
 ///
 /// Gracefully degrades to raw preview when no descriptor is found.
-pub fn format_typed(
+pub async fn format_typed(
     data: &eip712::TypedData,
     source: &dyn DescriptorSource,
     tokens: &dyn TokenSource,
@@ -268,11 +268,9 @@ pub fn format_typed(
         .verifying_contract
         .as_deref()
         .unwrap_or("0x0000000000000000000000000000000000000000");
-    match source.resolve_typed(chain_id, address) {
+    match source.resolve_typed(chain_id, address).await {
         Ok(resolved) => format_typed_data(&resolved.descriptor, data, tokens),
-        Err(error::ResolveError::NotFound { .. }) => {
-            Ok(eip712::build_typed_raw_fallback(data))
-        }
+        Err(error::ResolveError::NotFound { .. }) => Ok(eip712::build_typed_raw_fallback(data)),
         Err(e) => Err(Error::Resolve(e)),
     }
 }
@@ -683,8 +681,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_high_level_format() {
+    #[tokio::test]
+    async fn test_high_level_format() {
         let descriptor = Descriptor::from_json(test_descriptor_json()).unwrap();
         let mut source = resolver::StaticSource::new();
         source.add_calldata(1, "0xdac17f958d2ee523a2206206994597c13d831ec7", descriptor);
@@ -703,6 +701,7 @@ mod tests {
             &source,
             &EmptyTokenSource,
         )
+        .await
         .unwrap();
 
         assert_eq!(result.intent, "Transfer tokens");

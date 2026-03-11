@@ -16,7 +16,7 @@ required-features = ["uniffi"]
 [features]
 default = []
 uniffi = ["dep:uniffi", "uniffi/cli"]
-github-registry = ["dep:ureq"]
+github-registry = ["dep:reqwest"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -26,5 +26,6 @@ tiny-keccak = { version = "2", features = ["keccak"] }
 hex = "0.4"
 time = { version = "0.3", features = ["formatting", "macros"] }
 thiserror = "2"
-uniffi = { version = "0.31.0", default-features = false, optional = true }
-ureq = { version = "2", optional = true }
+tokio = { version = "1", features = ["rt", "macros", "sync"] }
+uniffi = { version = "0.31.0", default-features = false, features = ["tokio"], optional = true }
+reqwest = { version = "0.12", features = ["json"], optional = true }

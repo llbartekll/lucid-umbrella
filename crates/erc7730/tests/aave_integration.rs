@@ -435,8 +435,8 @@ fn real_wallet_supply_eth_mainnet() {
     .unwrap();
 
     // value = 0x5af3107a4000 = 100000000000000 wei = 0.0001 ETH
-    let value_bytes = hex::decode("00000000000000000000000000000000000000000000000000005af3107a4000")
-        .unwrap();
+    let value_bytes =
+        hex::decode("00000000000000000000000000000000000000000000000000005af3107a4000").unwrap();
 
     let result = format_calldata_with_from(
         &descriptor,
@@ -546,10 +546,9 @@ fn aave_withdraw_bytes32_optimism_graceful_fallback() {
     let tokens = aave_token_source();
 
     // Exact calldata from wallet: withdraw(bytes32) on Optimism chain 10
-    let calldata = hex::decode(
-        "8e19899e0000000000000000000000000000ffffffffffffffffffffffffffffffff0005",
-    )
-    .unwrap();
+    let calldata =
+        hex::decode("8e19899e0000000000000000000000000000ffffffffffffffffffffffffffffffff0005")
+            .unwrap();
 
     let result = format_calldata_with_from(
         &descriptor,
@@ -610,7 +609,9 @@ fn real_wallet_withdraw_usdc_mainnet() {
     // Recipient should be the from address
     let to_value = get_entry_value(&result, "To recipient");
     assert!(
-        to_value.to_lowercase().contains("bf01daf454dce008d3e2bfd47d5e186f71477253"),
+        to_value
+            .to_lowercase()
+            .contains("bf01daf454dce008d3e2bfd47d5e186f71477253"),
         "recipient should be the from address: {to_value}"
     );
     // Interpolated intent should use threshold/message formatting
@@ -668,8 +669,8 @@ fn real_wallet_withdraw_0_1_usdc_mainnet() {
 
 // --- FilesystemSource Test ---
 
-#[test]
-fn filesystem_source_aave() {
+#[tokio::test]
+async fn filesystem_source_aave() {
     use erc7730::resolver::{DescriptorSource, FilesystemSource};
 
     let fixtures_dir = format!("{}/tests/fixtures", env!("CARGO_MANIFEST_DIR"));
@@ -678,16 +679,20 @@ fn filesystem_source_aave() {
     // LPv3 on mainnet
     let resolved = source
         .resolve_calldata(1, "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2")
+        .await
         .unwrap();
     assert_eq!(resolved.chain_id, 1);
 
     // LPv3 on Base
     let resolved = source
         .resolve_calldata(8453, "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5")
+        .await
         .unwrap();
     assert_eq!(resolved.chain_id, 8453);
 
     // Not found
-    let err = source.resolve_calldata(1, "0x0000000000000000000000000000000000000001");
+    let err = source
+        .resolve_calldata(1, "0x0000000000000000000000000000000000000001")
+        .await;
     assert!(err.is_err());
 }

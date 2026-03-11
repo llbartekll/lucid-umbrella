@@ -2,6 +2,8 @@
 //! Includes [`StaticSource`] for testing and embedded use cases.
 
 use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 
 use crate::error::ResolveError;
 use crate::types::descriptor::Descriptor;
@@ -15,20 +17,20 @@ pub struct ResolvedDescriptor {
 }
 
 /// Trait for descriptor sources (embedded, filesystem, GitHub API, etc.).
-pub trait DescriptorSource {
+pub trait DescriptorSource: Send + Sync {
     /// Resolve a descriptor for contract calldata clear signing.
     fn resolve_calldata(
         &self,
         chain_id: u64,
         address: &str,
-    ) -> Result<ResolvedDescriptor, ResolveError>;
+    ) -> Pin<Box<dyn Future<Output = Result<ResolvedDescriptor, ResolveError>> + Send + '_>>;
 
     /// Resolve a descriptor for EIP-712 typed data clear signing.
     fn resolve_typed(
         &self,
         chain_id: u64,
         address: &str,
-    ) -> Result<ResolvedDescriptor, ResolveError>;
+    ) -> Pin<Box<dyn Future<Output = Result<ResolvedDescriptor, ResolveError>> + Send + '_>>;
 }
 
 /// Static in-memory descriptor source for testing.
@@ -100,9 +102,10 @@ impl DescriptorSource for StaticSource {
         &self,
         chain_id: u64,
         address: &str,
-    ) -> Result<ResolvedDescriptor, ResolveError> {
+    ) -> Pin<Box<dyn Future<Output = Result<ResolvedDescriptor, ResolveError>> + Send + '_>> {
         let key = Self::make_key(chain_id, address);
-        self.calldata
+        let result = self
+            .calldata
             .get(&key)
             .cloned()
             .map(|descriptor| ResolvedDescriptor {
@@ -113,16 +116,18 @@ impl DescriptorSource for StaticSource {
             .ok_or_else(|| ResolveError::NotFound {
                 chain_id,
                 address: address.to_string(),
-            })
+            });
+        Box::pin(async move { result })
     }
 
     fn resolve_typed(
         &self,
         chain_id: u64,
         address: &str,
-    ) -> Result<ResolvedDescriptor, ResolveError> {
+    ) -> Pin<Box<dyn Future<Output = Result<ResolvedDescriptor, ResolveError>> + Send + '_>> {
         let key = Self::make_key(chain_id, address);
-        self.typed
+        let result = self
+            .typed
             .get(&key)
             .cloned()
             .map(|descriptor| ResolvedDescriptor {
@@ -133,7 +138,8 @@ impl DescriptorSource for StaticSource {
             .ok_or_else(|| ResolveError::NotFound {
                 chain_id,
                 address: address.to_string(),
-            })
+            });
+        Box::pin(async move { result })
     }
 }
 
@@ -195,9 +201,10 @@ impl DescriptorSource for FilesystemSource {
         &self,
         chain_id: u64,
         address: &str,
-    ) -> Result<ResolvedDescriptor, ResolveError> {
+    ) -> Pin<Box<dyn Future<Output = Result<ResolvedDescriptor, ResolveError>> + Send + '_>> {
         let key = Self::make_key(chain_id, address);
-        self.index
+        let result = self
+            .index
             .get(&key)
             .cloned()
             .map(|descriptor| ResolvedDescriptor {
@@ -208,14 +215,15 @@ impl DescriptorSource for FilesystemSource {
             .ok_or_else(|| ResolveError::NotFound {
                 chain_id,
                 address: address.to_string(),
-            })
+            });
+        Box::pin(async move { result })
     }
 
     fn resolve_typed(
         &self,
         chain_id: u64,
         address: &str,
-    ) -> Result<ResolvedDescriptor, ResolveError> {
+    ) -> Pin<Box<dyn Future<Output = Result<ResolvedDescriptor, ResolveError>> + Send + '_>> {
         self.resolve_calldata(chain_id, address)
     }
 }
@@ -228,8 +236,8 @@ pub struct GitHubRegistrySource {
     base_url: String,
     /// Maps "{chain_id}:{address_lowercase}" → relative path in registry
     index: HashMap<String, String>,
-    /// In-memory descriptor cache (Mutex for Sync safety)
-    cache: std::sync::Mutex<HashMap<String, Descriptor>>,
+    /// In-memory descriptor cache (tokio Mutex for async safety)
+    cache: tokio::sync::Mutex<HashMap<String, Descriptor>>,
 }
 
 #[cfg(feature = "github-registry")]
@@ -242,25 +250,35 @@ impl GitHubRegistrySource {
         Self {
             base_url: base_url.trim_end_matches('/').to_string(),
             index,
-            cache: std::sync::Mutex::new(HashMap::new()),
+            cache: tokio::sync::Mutex::new(HashMap::new()),
         }
     }
 
     /// Create a source by fetching `index.json` from the registry.
     ///
     /// The index maps `"{chain_id}:{address_lowercase}"` → relative descriptor path.
-    pub fn from_registry(base_url: &str) -> Result<Self, ResolveError> {
+    pub async fn from_registry(base_url: &str) -> Result<Self, ResolveError> {
         let base = base_url.trim_end_matches('/');
         let index_url = format!("{}/index.json", base);
-        let response = ureq::get(&index_url).call().map_err(|e| match &e {
-            ureq::Error::Status(404, _) => ResolveError::NotFound {
+        let response = reqwest::get(&index_url).await.map_err(|e| {
+            if e.status() == Some(reqwest::StatusCode::NOT_FOUND) {
+                ResolveError::NotFound {
+                    chain_id: 0,
+                    address: format!("index.json at {index_url}"),
+                }
+            } else {
+                ResolveError::Io(format!("HTTP fetch index failed: {e}"))
+            }
+        })?;
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(ResolveError::NotFound {
                 chain_id: 0,
                 address: format!("index.json at {index_url}"),
-            },
-            _ => ResolveError::Io(format!("HTTP fetch index failed: {e}")),
-        })?;
+            });
+        }
         let body = response
-            .into_string()
+            .text()
+            .await
             .map_err(|e| ResolveError::Io(format!("read index response: {e}")))?;
         let index: HashMap<String, String> =
             serde_json::from_str(&body).map_err(|e| ResolveError::Parse(e.to_string()))?;
@@ -271,17 +289,27 @@ impl GitHubRegistrySource {
         format!("eip155:{}:{}", chain_id, address.to_lowercase())
     }
 
-    fn fetch_descriptor(&self, rel_path: &str) -> Result<Descriptor, ResolveError> {
+    async fn fetch_descriptor(&self, rel_path: &str) -> Result<Descriptor, ResolveError> {
         let url = format!("{}/{}", self.base_url, rel_path);
-        let response = ureq::get(&url).call().map_err(|e| match &e {
-            ureq::Error::Status(404, _) => ResolveError::NotFound {
+        let response = reqwest::get(&url).await.map_err(|e| {
+            if e.status() == Some(reqwest::StatusCode::NOT_FOUND) {
+                ResolveError::NotFound {
+                    chain_id: 0,
+                    address: format!("descriptor at {url}"),
+                }
+            } else {
+                ResolveError::Io(format!("HTTP fetch failed: {e}"))
+            }
+        })?;
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(ResolveError::NotFound {
                 chain_id: 0,
                 address: format!("descriptor at {url}"),
-            },
-            _ => ResolveError::Io(format!("HTTP fetch failed: {e}")),
-        })?;
+            });
+        }
         let body = response
-            .into_string()
+            .text()
+            .await
             .map_err(|e| ResolveError::Io(format!("read response: {e}")))?;
         serde_json::from_str(&body).map_err(|e| ResolveError::Parse(e.to_string()))
     }
@@ -293,33 +321,33 @@ impl DescriptorSource for GitHubRegistrySource {
         &self,
         chain_id: u64,
         address: &str,
-    ) -> Result<ResolvedDescriptor, ResolveError> {
-        let key = Self::make_key(chain_id, address);
+    ) -> Pin<Box<dyn Future<Output = Result<ResolvedDescriptor, ResolveError>> + Send + '_>> {
+        let address_owned = address.to_lowercase();
+        Box::pin(async move {
+            let key = Self::make_key(chain_id, &address_owned);
 
-        // Check cache first
-        if let Some(cached) = self.cache.lock().unwrap().get(&key) {
-            return Ok(ResolvedDescriptor {
-                descriptor: cached.clone(),
+            // Check cache first
+            if let Some(cached) = self.cache.lock().await.get(&key) {
+                return Ok(ResolvedDescriptor {
+                    descriptor: cached.clone(),
+                    chain_id,
+                    address: address_owned,
+                });
+            }
+
+            let rel_path = self.index.get(&key).ok_or_else(|| ResolveError::NotFound {
                 chain_id,
-                address: address.to_lowercase(),
-            });
-        }
+                address: address_owned.clone(),
+            })?;
 
-        let rel_path = self.index.get(&key).ok_or_else(|| ResolveError::NotFound {
-            chain_id,
-            address: address.to_string(),
-        })?;
+            let descriptor = self.fetch_descriptor(rel_path).await?;
+            self.cache.lock().await.insert(key, descriptor.clone());
 
-        let descriptor = self.fetch_descriptor(rel_path)?;
-        self.cache
-            .lock()
-            .unwrap()
-            .insert(key, descriptor.clone());
-
-        Ok(ResolvedDescriptor {
-            descriptor,
-            chain_id,
-            address: address.to_lowercase(),
+            Ok(ResolvedDescriptor {
+                descriptor,
+                chain_id,
+                address: address_owned,
+            })
         })
     }
 
@@ -327,7 +355,7 @@ impl DescriptorSource for GitHubRegistrySource {
         &self,
         chain_id: u64,
         address: &str,
-    ) -> Result<ResolvedDescriptor, ResolveError> {
+    ) -> Pin<Box<dyn Future<Output = Result<ResolvedDescriptor, ResolveError>> + Send + '_>> {
         self.resolve_calldata(chain_id, address)
     }
 }
@@ -336,10 +364,10 @@ impl DescriptorSource for GitHubRegistrySource {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_static_source_not_found() {
+    #[tokio::test]
+    async fn test_static_source_not_found() {
         let source = StaticSource::new();
-        let result = source.resolve_calldata(1, "0xabc");
+        let result = source.resolve_calldata(1, "0xabc").await;
         assert!(result.is_err());
     }
 }

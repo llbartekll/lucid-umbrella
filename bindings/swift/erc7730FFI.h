@@ -243,9 +243,19 @@ typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureRes
     );
 
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ERC7730_FN_FUNC_ERC7730_FORMAT
+#define UNIFFI_FFIDEF_UNIFFI_ERC7730_FN_FUNC_ERC7730_FORMAT
+uint64_t uniffi_erc7730_fn_func_erc7730_format(uint64_t chain_id, RustBuffer to, RustBuffer calldata_hex, RustBuffer value_hex, RustBuffer from_address, RustBuffer tokens
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ERC7730_FN_FUNC_ERC7730_FORMAT_CALLDATA
 #define UNIFFI_FFIDEF_UNIFFI_ERC7730_FN_FUNC_ERC7730_FORMAT_CALLDATA
-RustBuffer uniffi_erc7730_fn_func_erc7730_format_calldata(RustBuffer descriptor_json, uint64_t chain_id, RustBuffer to, RustBuffer calldata_hex, RustBuffer value_hex, RustBuffer tokens, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_erc7730_fn_func_erc7730_format_calldata(RustBuffer descriptor_json, uint64_t chain_id, RustBuffer to, RustBuffer calldata_hex, RustBuffer value_hex, RustBuffer from_address, RustBuffer tokens, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ERC7730_FN_FUNC_ERC7730_FORMAT_TYPED
+#define UNIFFI_FFIDEF_UNIFFI_ERC7730_FN_FUNC_ERC7730_FORMAT_TYPED
+uint64_t uniffi_erc7730_fn_func_erc7730_format_typed(RustBuffer typed_data_json, RustBuffer tokens
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ERC7730_FN_FUNC_ERC7730_FORMAT_TYPED_DATA
@@ -513,9 +523,21 @@ void ffi_erc7730_rust_future_free_void(uint64_t handle
 void ffi_erc7730_rust_future_complete_void(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ERC7730_CHECKSUM_FUNC_ERC7730_FORMAT
+#define UNIFFI_FFIDEF_UNIFFI_ERC7730_CHECKSUM_FUNC_ERC7730_FORMAT
+uint16_t uniffi_erc7730_checksum_func_erc7730_format(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ERC7730_CHECKSUM_FUNC_ERC7730_FORMAT_CALLDATA
 #define UNIFFI_FFIDEF_UNIFFI_ERC7730_CHECKSUM_FUNC_ERC7730_FORMAT_CALLDATA
 uint16_t uniffi_erc7730_checksum_func_erc7730_format_calldata(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ERC7730_CHECKSUM_FUNC_ERC7730_FORMAT_TYPED
+#define UNIFFI_FFIDEF_UNIFFI_ERC7730_CHECKSUM_FUNC_ERC7730_FORMAT_TYPED
+uint16_t uniffi_erc7730_checksum_func_erc7730_format_typed(void
     
 );
 #endif

@@ -1099,22 +1099,72 @@ fileprivate struct FfiConverterSequenceTypeDisplayEntry: FfiConverterRustBuffer 
         return seq
     }
 }
+private let UNIFFI_RUST_FUTURE_POLL_READY: Int8 = 0
+private let UNIFFI_RUST_FUTURE_POLL_WAKE: Int8 = 1
+
+fileprivate let uniffiContinuationHandleMap = UniffiHandleMap<UnsafeContinuation<Int8, Never>>()
+
+fileprivate func uniffiRustCallAsync<F, T>(
+    rustFutureFunc: () -> UInt64,
+    pollFunc: (UInt64, @escaping UniffiRustFutureContinuationCallback, UInt64) -> (),
+    completeFunc: (UInt64, UnsafeMutablePointer<RustCallStatus>) -> F,
+    freeFunc: (UInt64) -> (),
+    liftFunc: (F) throws -> T,
+    errorHandler: ((RustBuffer) throws -> Swift.Error)?
+) async throws -> T {
+    // Make sure to call the ensure init function since future creation doesn't have a
+    // RustCallStatus param, so doesn't use makeRustCall()
+    uniffiEnsureErc7730Initialized()
+    let rustFuture = rustFutureFunc()
+    defer {
+        freeFunc(rustFuture)
+    }
+    var pollResult: Int8;
+    repeat {
+        pollResult = await withUnsafeContinuation {
+            pollFunc(
+                rustFuture,
+                { handle, pollResult in
+                    uniffiFutureContinuationCallback(handle: handle, pollResult: pollResult)
+                },
+                uniffiContinuationHandleMap.insert(obj: $0)
+            )
+        }
+    } while pollResult != UNIFFI_RUST_FUTURE_POLL_READY
+
+    return try liftFunc(makeRustCall(
+        { completeFunc(rustFuture, $0) },
+        errorHandler: errorHandler
+    ))
+}
+
+// Callback handlers for an async calls.  These are invoked by Rust when the future is ready.  They
+// lift the return value or error and resume the suspended function.
+fileprivate func uniffiFutureContinuationCallback(handle: UInt64, pollResult: Int8) {
+    if let continuation = try? uniffiContinuationHandleMap.remove(handle: handle) {
+        continuation.resume(returning: pollResult)
+    } else {
+        print("uniffiFutureContinuationCallback invalid handle")
+    }
+}
 /**
  * High-level: resolve descriptor from GitHub registry, then format calldata.
  *
  * Requires the `github-registry` feature.
  */
-public func erc7730Format(chainId: UInt64, to: String, calldataHex: String, valueHex: String?, fromAddress: String?, tokens: [TokenMetaInput])throws  -> DisplayModel  {
-    return try  FfiConverterTypeDisplayModel_lift(try rustCallWithError(FfiConverterTypeFfiError_lift) {
-    uniffi_erc7730_fn_func_erc7730_format(
-        FfiConverterUInt64.lower(chainId),
-        FfiConverterString.lower(to),
-        FfiConverterString.lower(calldataHex),
-        FfiConverterOptionString.lower(valueHex),
-        FfiConverterOptionString.lower(fromAddress),
-        FfiConverterSequenceTypeTokenMetaInput.lower(tokens),$0
-    )
-})
+public func erc7730Format(chainId: UInt64, to: String, calldataHex: String, valueHex: String?, fromAddress: String?, tokens: [TokenMetaInput])async throws  -> DisplayModel  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_erc7730_fn_func_erc7730_format(FfiConverterUInt64.lower(chainId),FfiConverterString.lower(to),FfiConverterString.lower(calldataHex),FfiConverterOptionString.lower(valueHex),FfiConverterOptionString.lower(fromAddress),FfiConverterSequenceTypeTokenMetaInput.lower(tokens)
+                )
+            },
+            pollFunc: ffi_erc7730_rust_future_poll_rust_buffer,
+            completeFunc: ffi_erc7730_rust_future_complete_rust_buffer,
+            freeFunc: ffi_erc7730_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeDisplayModel_lift,
+            errorHandler: FfiConverterTypeFfiError_lift
+        )
 }
 public func erc7730FormatCalldata(descriptorJson: String, chainId: UInt64, to: String, calldataHex: String, valueHex: String?, fromAddress: String?, tokens: [TokenMetaInput])throws  -> DisplayModel  {
     return try  FfiConverterTypeDisplayModel_lift(try rustCallWithError(FfiConverterTypeFfiError_lift) {
@@ -1134,13 +1184,19 @@ public func erc7730FormatCalldata(descriptorJson: String, chainId: UInt64, to: S
  *
  * Requires the `github-registry` feature.
  */
-public func erc7730FormatTyped(typedDataJson: String, tokens: [TokenMetaInput])throws  -> DisplayModel  {
-    return try  FfiConverterTypeDisplayModel_lift(try rustCallWithError(FfiConverterTypeFfiError_lift) {
-    uniffi_erc7730_fn_func_erc7730_format_typed(
-        FfiConverterString.lower(typedDataJson),
-        FfiConverterSequenceTypeTokenMetaInput.lower(tokens),$0
-    )
-})
+public func erc7730FormatTyped(typedDataJson: String, tokens: [TokenMetaInput])async throws  -> DisplayModel  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_erc7730_fn_func_erc7730_format_typed(FfiConverterString.lower(typedDataJson),FfiConverterSequenceTypeTokenMetaInput.lower(tokens)
+                )
+            },
+            pollFunc: ffi_erc7730_rust_future_poll_rust_buffer,
+            completeFunc: ffi_erc7730_rust_future_complete_rust_buffer,
+            freeFunc: ffi_erc7730_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeDisplayModel_lift,
+            errorHandler: FfiConverterTypeFfiError_lift
+        )
 }
 public func erc7730FormatTypedData(descriptorJson: String, typedDataJson: String, tokens: [TokenMetaInput])throws  -> DisplayModel  {
     return try  FfiConverterTypeDisplayModel_lift(try rustCallWithError(FfiConverterTypeFfiError_lift) {
@@ -1167,13 +1223,13 @@ private let initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
-    if (uniffi_erc7730_checksum_func_erc7730_format() != 46408) {
+    if (uniffi_erc7730_checksum_func_erc7730_format() != 61390) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_erc7730_checksum_func_erc7730_format_calldata() != 45099) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_erc7730_checksum_func_erc7730_format_typed() != 21669) {
+    if (uniffi_erc7730_checksum_func_erc7730_format_typed() != 55740) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_erc7730_checksum_func_erc7730_format_typed_data() != 31759) {

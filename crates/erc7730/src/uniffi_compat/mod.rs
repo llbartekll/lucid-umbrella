@@ -8,9 +8,6 @@ use crate::{
 };
 
 #[cfg(feature = "github-registry")]
-use std::sync::OnceLock;
-
-#[cfg(feature = "github-registry")]
 use crate::resolver::GitHubRegistrySource;
 
 #[cfg(feature = "github-registry")]
@@ -21,19 +18,18 @@ const DEFAULT_REGISTRY_URL: &str =
     "https://raw.githubusercontent.com/llbartekll/7730-v2-registry/main";
 
 #[cfg(feature = "github-registry")]
-static REGISTRY_SOURCE: OnceLock<Result<GitHubRegistrySource, String>> = OnceLock::new();
+static REGISTRY_SOURCE: tokio::sync::OnceCell<GitHubRegistrySource> =
+    tokio::sync::OnceCell::const_new();
 
 #[cfg(feature = "github-registry")]
-fn get_registry_source() -> Result<&'static GitHubRegistrySource, FfiError> {
-    let result = REGISTRY_SOURCE.get_or_init(|| {
-        GitHubRegistrySource::from_registry(DEFAULT_REGISTRY_URL).map_err(|e| e.to_string())
-    });
-    match result {
-        Ok(source) => Ok(source),
-        Err(e) => Err(FfiError::Resolve(format!(
-            "failed to initialize registry: {e}"
-        ))),
-    }
+async fn get_registry_source() -> Result<&'static GitHubRegistrySource, FfiError> {
+    REGISTRY_SOURCE
+        .get_or_try_init(|| async {
+            GitHubRegistrySource::from_registry(DEFAULT_REGISTRY_URL)
+                .await
+                .map_err(|e| FfiError::Resolve(format!("failed to initialize registry: {e}")))
+        })
+        .await
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
@@ -92,19 +88,30 @@ pub fn erc7730_format_calldata(
     println!("[erc7730] format_calldata called");
     println!("[erc7730]   chain_id={}", chain_id);
     println!("[erc7730]   to={}", to);
-    println!("[erc7730]   calldata_hex={}", &calldata_hex[..std::cmp::min(20, calldata_hex.len())]);
+    println!(
+        "[erc7730]   calldata_hex={}",
+        &calldata_hex[..std::cmp::min(20, calldata_hex.len())]
+    );
     println!("[erc7730]   value_hex={:?}", value_hex);
     println!("[erc7730]   from_address={:?}", from_address);
     println!("[erc7730]   tokens count={}", tokens.len());
-    println!("[erc7730]   descriptor_json length={}", descriptor_json.len());
+    println!(
+        "[erc7730]   descriptor_json length={}",
+        descriptor_json.len()
+    );
 
     let descriptor = match Descriptor::from_json(&descriptor_json) {
         Ok(d) => {
             println!("[erc7730]   descriptor parsed OK");
-            println!("[erc7730]   format keys: {:?}", d.display.formats.keys().collect::<Vec<_>>());
-            println!("[erc7730]   context is_contract={} deployments={:?}",
+            println!(
+                "[erc7730]   format keys: {:?}",
+                d.display.formats.keys().collect::<Vec<_>>()
+            );
+            println!(
+                "[erc7730]   context is_contract={} deployments={:?}",
                 d.context.is_contract(),
-                d.context.deployments());
+                d.context.deployments()
+            );
             d
         }
         Err(err) => {
@@ -123,7 +130,10 @@ pub fn erc7730_format_calldata(
         Some(hex_value) => Some(decode_hex(&hex_value, HexContext::Value)?),
         None => None,
     };
-    println!("[erc7730]   value decoded, {} bytes", value.as_ref().map_or(0, |v| v.len()));
+    println!(
+        "[erc7730]   value decoded, {} bytes",
+        value.as_ref().map_or(0, |v| v.len())
+    );
 
     let token_source = build_token_source(&tokens);
     let result = crate::format_calldata_with_from(
@@ -162,14 +172,23 @@ pub fn erc7730_format_typed_data(
     tokens: Vec<TokenMetaInput>,
 ) -> Result<DisplayModel, FfiError> {
     println!("[erc7730] format_typed_data called");
-    println!("[erc7730]   descriptor_json length={}", descriptor_json.len());
-    println!("[erc7730]   typed_data_json length={}", typed_data_json.len());
+    println!(
+        "[erc7730]   descriptor_json length={}",
+        descriptor_json.len()
+    );
+    println!(
+        "[erc7730]   typed_data_json length={}",
+        typed_data_json.len()
+    );
     println!("[erc7730]   tokens count={}", tokens.len());
 
     let descriptor = match Descriptor::from_json(&descriptor_json) {
         Ok(d) => {
             println!("[erc7730]   descriptor parsed OK");
-            println!("[erc7730]   format keys: {:?}", d.display.formats.keys().collect::<Vec<_>>());
+            println!(
+                "[erc7730]   format keys: {:?}",
+                d.display.formats.keys().collect::<Vec<_>>()
+            );
             d
         }
         Err(err) => {
@@ -180,9 +199,14 @@ pub fn erc7730_format_typed_data(
 
     let typed_data: TypedData = match serde_json::from_str::<TypedData>(&typed_data_json) {
         Ok(td) => {
-            println!("[erc7730]   typed_data parsed OK, primaryType={}", td.primary_type);
-            println!("[erc7730]   domain: name={:?} chainId={:?} verifyingContract={:?}",
-                td.domain.name, td.domain.chain_id, td.domain.verifying_contract);
+            println!(
+                "[erc7730]   typed_data parsed OK, primaryType={}",
+                td.primary_type
+            );
+            println!(
+                "[erc7730]   domain: name={:?} chainId={:?} verifyingContract={:?}",
+                td.domain.name, td.domain.chain_id, td.domain.verifying_contract
+            );
             td
         }
         Err(err) => {
@@ -214,8 +238,8 @@ pub fn erc7730_format_typed_data(
 ///
 /// Requires the `github-registry` feature.
 #[cfg(feature = "github-registry")]
-#[uniffi::export]
-pub fn erc7730_format(
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn erc7730_format(
     chain_id: u64,
     to: String,
     calldata_hex: String,
@@ -231,7 +255,7 @@ pub fn erc7730_format(
         &calldata_hex[..std::cmp::min(20, calldata_hex.len())]
     );
 
-    let source = get_registry_source()?;
+    let source = get_registry_source().await?;
     let calldata = decode_hex(&calldata_hex, HexContext::Calldata)?;
     let value = match value_hex {
         Some(hex_value) => Some(decode_hex(&hex_value, HexContext::Value)?),
@@ -240,10 +264,7 @@ pub fn erc7730_format(
 
     let caller_tokens = build_token_source(&tokens);
     let well_known = WellKnownTokenSource::new();
-    let composite = CompositeTokenSource::new(vec![
-        Box::new(caller_tokens),
-        Box::new(well_known),
-    ]);
+    let composite = CompositeTokenSource::new(vec![Box::new(caller_tokens), Box::new(well_known)]);
 
     let result = crate::format_with_from(
         chain_id,
@@ -253,7 +274,8 @@ pub fn erc7730_format(
         from_address.as_deref(),
         source,
         &composite,
-    );
+    )
+    .await;
 
     match &result {
         Ok(model) => {
@@ -272,8 +294,8 @@ pub fn erc7730_format(
 ///
 /// Requires the `github-registry` feature.
 #[cfg(feature = "github-registry")]
-#[uniffi::export]
-pub fn erc7730_format_typed(
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn erc7730_format_typed(
     typed_data_json: String,
     tokens: Vec<TokenMetaInput>,
 ) -> Result<DisplayModel, FfiError> {
@@ -291,16 +313,13 @@ pub fn erc7730_format_typed(
         typed_data.primary_type, typed_data.domain.verifying_contract
     );
 
-    let source = get_registry_source()?;
+    let source = get_registry_source().await?;
 
     let caller_tokens = build_token_source(&tokens);
     let well_known = WellKnownTokenSource::new();
-    let composite = CompositeTokenSource::new(vec![
-        Box::new(caller_tokens),
-        Box::new(well_known),
-    ]);
+    let composite = CompositeTokenSource::new(vec![Box::new(caller_tokens), Box::new(well_known)]);
 
-    let result = crate::format_typed(&typed_data, source, &composite);
+    let result = crate::format_typed(&typed_data, source, &composite).await;
 
     match &result {
         Ok(model) => {

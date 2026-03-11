@@ -11,9 +11,9 @@ struct ClearSigningService {
         calldata: String,
         value: String?,
         from: String?
-    ) -> Result<DisplayModel, Error> {
+    ) async -> Result<DisplayModel, Error> {
         do {
-            let model = try erc7730Format(
+            let model = try await erc7730Format(
                 chainId: chainId,
                 to: to,
                 calldataHex: calldata,
@@ -29,9 +29,9 @@ struct ClearSigningService {
 
     /// Format EIP-712 typed data.
     /// Resolves descriptors from the GitHub registry internally.
-    func formatTypedData(typedDataJson: String) -> Result<DisplayModel, Error> {
+    func formatTypedData(typedDataJson: String) async -> Result<DisplayModel, Error> {
         do {
-            let model = try erc7730FormatTyped(
+            let model = try await erc7730FormatTyped(
                 typedDataJson: typedDataJson,
                 tokens: []
             )
