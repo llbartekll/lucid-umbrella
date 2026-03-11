@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct KeyImportSection: View {
     @Bindable var viewModel: WalletViewModel
@@ -7,11 +8,18 @@ struct KeyImportSection: View {
         Section("Ethereum Key") {
             if let address = viewModel.ethereumAddress {
                 LabeledContent("Address") {
-                    Text(address)
-                        .font(.caption.monospaced())
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .textSelection(.enabled)
+                    Button {
+                        copyToClipboard(address)
+                    } label: {
+                        Text(address)
+                            .font(.caption.monospaced())
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
                 }
                 Button("Clear Key", role: .destructive) {
                     viewModel.clearKey()
@@ -34,5 +42,9 @@ struct KeyImportSection: View {
                 }
             }
         }
+    }
+
+    private func copyToClipboard(_ value: String) {
+        UIPasteboard.general.string = value
     }
 }
