@@ -385,7 +385,7 @@ fn format_value(
 
     match fmt {
         FieldFormat::TokenAmount => format_token_amount(ctx, val, params, label, path),
-        FieldFormat::Amount => format_amount(val),
+        FieldFormat::Amount => format_amount(ctx, val, path),
         FieldFormat::Date => format_date(val),
         FieldFormat::Enum => format_enum(ctx, val, params),
         FieldFormat::Address => Ok(format_address(val)),
@@ -650,11 +650,17 @@ fn native_token_meta(chain_id: u64) -> crate::token::TokenMeta {
     }
 }
 
-fn format_amount(val: &ArgumentValue) -> Result<String, Error> {
+fn format_amount(ctx: &RenderContext<'_>, val: &ArgumentValue, path: &str) -> Result<String, Error> {
     match val {
         ArgumentValue::Uint(bytes) | ArgumentValue::Int(bytes) => {
             let n = BigUint::from_bytes_be(bytes);
-            Ok(n.to_string())
+            if path.starts_with("@.value") {
+                let meta = native_token_meta(ctx.chain_id);
+                let formatted = format_with_decimals(&n, meta.decimals);
+                Ok(format!("{} {}", formatted, meta.symbol))
+            } else {
+                Ok(n.to_string())
+            }
         }
         _ => Ok(format_raw(val)),
     }
@@ -907,6 +913,21 @@ fn resolve_and_format_for_interpolation(
                 Some(FieldFormat::Address) => format_address(&v),
                 Some(FieldFormat::TokenAmount) => {
                     format_token_amount_for_interpolation(ctx, &v, field_params)
+                }
+                Some(FieldFormat::Amount) => {
+                    if path.starts_with("@.value") {
+                        let meta = native_token_meta(ctx.chain_id);
+                        match &v {
+                            ArgumentValue::Uint(bytes) | ArgumentValue::Int(bytes) => {
+                                let n = BigUint::from_bytes_be(bytes);
+                                let formatted = format_with_decimals(&n, meta.decimals);
+                                format!("{} {}", formatted, meta.symbol)
+                            }
+                            _ => format_raw(&v),
+                        }
+                    } else {
+                        format_raw(&v)
+                    }
                 }
                 _ => format_raw(&v),
             }

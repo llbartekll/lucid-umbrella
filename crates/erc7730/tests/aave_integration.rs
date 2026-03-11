@@ -374,9 +374,9 @@ fn gateway_deposit_eth() {
     .unwrap();
 
     assert_eq!(result.intent, "Supply");
-    // @.value should be resolved from the transaction value
+    // @.value should be formatted as native currency (ETH with 18 decimals)
     let amount = get_entry_value(&result, "Amount to supply");
-    assert_eq!(amount, "1000000000000000000");
+    assert_eq!(amount, "1 ETH");
 }
 
 #[test]
@@ -415,6 +415,52 @@ fn gateway_borrow_eth_with_from() {
     assert!(
         debtor.to_lowercase().contains("aaaaaa"),
         "debtor should contain the from address: {debtor}"
+    );
+}
+
+/// Real wallet request: depositETH with value=0x5af3107a4000 (0.0001 ETH) on mainnet.
+/// Verifies @.value with format "amount" renders native currency (decimals + symbol).
+#[test]
+fn real_wallet_supply_eth_mainnet() {
+    let descriptor = load_descriptor("aave-gateway.json");
+    let tokens = aave_token_source();
+
+    // depositETH(address,address,uint16) calldata from real wallet
+    let calldata = hex::decode(
+        "474cf53d\
+         00000000000000000000000087870bca3f3fd6335c3f4ce8392d69350b4fa4e2\
+         000000000000000000000000bf01daf454dce008d3e2bfd47d5e186f71477253\
+         0000000000000000000000000000000000000000000000000000000000000000",
+    )
+    .unwrap();
+
+    // value = 0x5af3107a4000 = 100000000000000 wei = 0.0001 ETH
+    let value_bytes = hex::decode("00000000000000000000000000000000000000000000000000005af3107a4000")
+        .unwrap();
+
+    let result = format_calldata_with_from(
+        &descriptor,
+        1,
+        "0xd01607c3C5eCABa394D8be377a08590149325722",
+        &calldata,
+        Some(&value_bytes),
+        Some("0xbf01daf454dce008d3e2bfd47d5e186f71477253"),
+        &tokens,
+    )
+    .unwrap();
+
+    assert_eq!(result.intent, "Supply");
+    assert_eq!(get_entry_value(&result, "Amount to supply"), "0.0001 ETH");
+
+    // Interpolated intent should show "0.0001 ETH", not raw wei
+    let interp = result.interpolated_intent.as_deref().unwrap();
+    assert!(
+        interp.contains("0.0001 ETH"),
+        "interpolated intent should contain '0.0001 ETH': {interp}"
+    );
+    assert!(
+        !interp.contains("100000000000000"),
+        "interpolated intent should NOT contain raw wei: {interp}"
     );
 }
 
