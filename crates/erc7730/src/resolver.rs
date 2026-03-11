@@ -268,7 +268,7 @@ impl GitHubRegistrySource {
     }
 
     fn make_key(chain_id: u64, address: &str) -> String {
-        format!("{}:{}", chain_id, address.to_lowercase())
+        format!("eip155:{}:{}", chain_id, address.to_lowercase())
     }
 
     fn fetch_descriptor(&self, rel_path: &str) -> Result<Descriptor, ResolveError> {

@@ -528,6 +528,53 @@ fn aave_withdraw_bytes32_optimism_graceful_fallback() {
     assert_eq!(result.entries.len(), 1);
 }
 
+// --- Real Wallet Request: Withdraw USDC on Mainnet ---
+
+/// Exact eth_sendTransaction from a real wallet session:
+/// to=0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2 (Aave LPv3, chain 1)
+/// data=0x69328dec... (withdraw(address,uint256,address))
+/// from=0xbf01daf454dce008d3e2bfd47d5e186f71477253
+/// value=0x0
+#[test]
+fn real_wallet_withdraw_usdc_mainnet() {
+    let descriptor = load_descriptor("aave-lpv3.json");
+    let tokens = aave_token_source();
+
+    let calldata = hex::decode(
+        "69328dec\
+         000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48\
+         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+         000000000000000000000000bf01daf454dce008d3e2bfd47d5e186f71477253",
+    )
+    .unwrap();
+
+    let result = format_calldata_with_from(
+        &descriptor,
+        1,
+        "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2",
+        &calldata,
+        Some(&[0x00]),
+        Some("0xbf01daf454dce008d3e2bfd47d5e186f71477253"),
+        &tokens,
+    )
+    .unwrap();
+
+    assert_eq!(result.intent, "Withdraw");
+    assert_eq!(get_entry_value(&result, "Amount to withdraw"), "Max USDC");
+    // Recipient should be the from address
+    let to_value = get_entry_value(&result, "To recipient");
+    assert!(
+        to_value.to_lowercase().contains("bf01daf454dce008d3e2bfd47d5e186f71477253"),
+        "recipient should be the from address: {to_value}"
+    );
+    // Interpolated intent uses raw values (not threshold/message formatting)
+    let interp = result.interpolated_intent.as_deref().unwrap();
+    assert!(
+        interp.contains("Withdraw") && interp.to_lowercase().contains("bf01daf454dce"),
+        "interpolated intent should contain 'Withdraw' and recipient: {interp}"
+    );
+}
+
 // --- FilesystemSource Test ---
 
 #[test]
