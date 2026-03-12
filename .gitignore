@@ -6,3 +6,4 @@
 /.swiftpm/
 wallet/Config.xcconfig
 **/xcuserdata/
+.env
