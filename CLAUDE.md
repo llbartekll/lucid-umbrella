@@ -106,6 +106,14 @@ Optional features:
   - Registry source is cached via `tokio::sync::OnceCell` in FFI layer — index fetched once per process
   - UniFFI async exports use `#[uniffi::export(async_runtime = "tokio")]`; `uniffi` dep requires `features = ["tokio"]`
 
+## Skills
+
+- **`check-descriptor`** (`.claude/skills/check-descriptor/`): Validates ERC-7730 descriptor function signatures against on-chain contract ABIs via Etherscan. Trigger with `/check-descriptor <path-or-url>` or phrases like "check this descriptor", "validate descriptor against on-chain". Handles proxy contracts automatically.
+
+## Environment
+
+- **`ETHERSCAN_API_KEY`**: Available in `.env` at repo root. Load with `[ -f .env ] && export $(grep -v '^#' .env | xargs 2>/dev/null)` before calling Etherscan. Use the V2 API: `https://api.etherscan.io/v2/api?chainid={id}&...`
+
 ## Pending
 
 - **Phase 2**: `format_multi()` + `FieldFormat::Calldata` (nested calldata, Safe wallet support)
