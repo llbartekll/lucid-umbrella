@@ -1940,10 +1940,13 @@ fn format_raw_with_separator(val: &ArgumentValue, separator: Option<&str>) -> St
 fn format_raw(val: &ArgumentValue) -> String {
     match val {
         ArgumentValue::Address(addr) => eip55_checksum(addr),
-        ArgumentValue::Uint(bytes) | ArgumentValue::Int(bytes) => {
-            let n = BigUint::from_bytes_be(bytes);
-            n.to_string()
-        }
+        ArgumentValue::Uint(bytes) => BigUint::from_bytes_be(bytes).to_string(),
+        // ERC-7730 defines `raw` as "the natural representation of the
+        // underlying structured data type", and for `intN` that is signed.
+        // Sharing the unsigned arm printed a tick of -140 as 2^256 - 140 —
+        // not a wrong-looking number, but a plausible-looking huge one, on a
+        // screen whose whole purpose is telling someone what they are signing.
+        ArgumentValue::Int(bytes) => int_to_bigint(bytes).to_string(),
         ArgumentValue::Bool(b) => b.to_string(),
         ArgumentValue::Bytes(b) | ArgumentValue::FixedBytes(b) => {
             format!("0x{}", hex::encode(b))
@@ -2590,6 +2593,44 @@ mod tests {
     use super::*;
     use crate::decoder::{DecodedArgument, ParamType};
     use crate::path::{parse_collection_access, CollectionAccess};
+
+    #[test]
+    fn raw_renders_signed_integers_as_signed() {
+        // ERC-7730 calls `raw` "the natural representation of the underlying
+        // structured data type". For `intN` that is signed, and a descriptor
+        // author has no other way to ask for one: there is no signed-integer
+        // format in the v2 schema, so `raw` is it.
+        //
+        // Sharing an arm with `Uint` printed the two's-complement word through
+        // `BigUint`, so a Uniswap-style tick of -140 read as 2^256 - 140. That
+        // is the failure mode worth a test: not a number that looks wrong, but
+        // a plausible-looking enormous one, on the screen that exists to tell
+        // someone what they are about to sign.
+        let minus_140 = {
+            let mut word = [0xffu8; 32];
+            word[31] = 0x74; // -140 in two's complement
+            word.to_vec()
+        };
+        assert_eq!(format_raw(&ArgumentValue::Int(minus_140)), "-140");
+
+        // Same bytes as an unsigned word are unchanged: the fix must not move
+        // the boundary, only stop crossing it.
+        let mut max = [0xffu8; 32];
+        max[31] = 0x74;
+        assert_eq!(
+            format_raw(&ArgumentValue::Uint(max.to_vec())),
+            (num_bigint::BigUint::from_bytes_be(&max)).to_string()
+        );
+
+        // Positive signed values, zero, and the sign-bit boundary.
+        assert_eq!(format_raw(&ArgumentValue::Int(vec![0x00; 32])), "0");
+        let mut positive = [0u8; 32];
+        positive[31] = 0x7f;
+        assert_eq!(format_raw(&ArgumentValue::Int(positive.to_vec())), "127");
+        let mut negative_one = [0xffu8; 32];
+        negative_one[31] = 0xff;
+        assert_eq!(format_raw(&ArgumentValue::Int(negative_one.to_vec())), "-1");
+    }
 
     #[test]
     fn test_eip55_checksum() {
