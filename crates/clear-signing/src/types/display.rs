@@ -1,6 +1,6 @@
 //! Display configuration types: field formats, visibility rules, and layout groups.
 
-use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint, Sign};
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 
@@ -238,15 +238,108 @@ pub struct VisibleCondition {
 
 impl VisibleCondition {
     pub fn hides_for_if_not_in(&self, value: &serde_json::Value) -> bool {
-        self.if_not_in
-            .as_ref()
-            .is_some_and(|excluded| excluded.contains(value))
+        self.if_not_in.as_ref().is_some_and(|excluded| {
+            excluded
+                .iter()
+                .any(|expected| visibility_values_equal(expected, value))
+        })
     }
 
     pub fn matches_must_match(&self, value: &serde_json::Value) -> bool {
-        self.must_match
-            .as_ref()
-            .is_none_or(|required| required.contains(value))
+        self.must_match.as_ref().is_none_or(|required| {
+            required
+                .iter()
+                .any(|expected| visibility_values_equal(expected, value))
+        })
+    }
+}
+
+/// Integer parsed from a visibility value.
+enum VisibilityInt {
+    /// Decimal literal, possibly negative.
+    Decimal(BigInt),
+    /// Hex literal with its bit width.
+    Hex(BigUint, u64),
+}
+
+fn parse_visibility_int(text: &str) -> Option<VisibilityInt> {
+    if let Some(hex_digits) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
+        let bytes = hex::decode(hex_digits).ok()?;
+        return Some(VisibilityInt::Hex(
+            BigUint::from_bytes_be(&bytes),
+            hex_digits.len() as u64 * 4,
+        ));
+    }
+    if !text
+        .strip_prefix('-')
+        .unwrap_or(text)
+        .bytes()
+        .all(|b| b.is_ascii_digit())
+    {
+        return None;
+    }
+    text.parse::<BigInt>().ok().map(VisibilityInt::Decimal)
+}
+
+fn visibility_scalar_text(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::String(s) => Some(s.clone()),
+        serde_json::Value::Number(n) => Some(n.to_string()),
+        serde_json::Value::Bool(b) => Some(b.to_string()),
+        _ => None,
+    }
+}
+
+fn is_hex_literal(text: &str) -> bool {
+    text.starts_with("0x") || text.starts_with("0X")
+}
+
+/// Interpret a hex literal as two's complement of its own bit width.
+fn hex_as_signed(magnitude: &BigUint, bits: u64) -> BigInt {
+    let signed = BigInt::from(magnitude.clone());
+    if bits > 0 && magnitude.bit(bits - 1) {
+        signed - (BigInt::from(1) << bits)
+    } else {
+        signed
+    }
+}
+
+/// Compare a descriptor `mustMatch` / `ifNotIn` value with a decoded value.
+///
+/// Hex literals compare case-insensitively, so checksummed addresses match
+/// lowercase decoded addresses. A decimal literal (string or JSON number)
+/// compares as an integer against a hex word or another decimal. A negative
+/// decimal reads a hex word as two's complement.
+fn visibility_values_equal(expected: &serde_json::Value, actual: &serde_json::Value) -> bool {
+    if expected == actual {
+        return true;
+    }
+    let (Some(expected), Some(actual)) = (
+        visibility_scalar_text(expected),
+        visibility_scalar_text(actual),
+    ) else {
+        return false;
+    };
+    if is_hex_literal(&expected) && is_hex_literal(&actual) {
+        return expected.eq_ignore_ascii_case(&actual);
+    }
+    let (Some(expected), Some(actual)) = (
+        parse_visibility_int(&expected),
+        parse_visibility_int(&actual),
+    ) else {
+        return false;
+    };
+    match (expected, actual) {
+        (VisibilityInt::Decimal(a), VisibilityInt::Decimal(b)) => a == b,
+        (VisibilityInt::Decimal(dec), VisibilityInt::Hex(mag, bits))
+        | (VisibilityInt::Hex(mag, bits), VisibilityInt::Decimal(dec)) => {
+            if dec.sign() == Sign::Minus {
+                hex_as_signed(&mag, bits) == dec
+            } else {
+                BigInt::from(mag) == dec
+            }
+        }
+        (VisibilityInt::Hex(..), VisibilityInt::Hex(..)) => false,
     }
 }
 

@@ -569,6 +569,8 @@ fn render_typed_group_field_kind<'a>(
                             )
                             .await?
                             {
+                                // Keep the slot so bundled groups stay aligned.
+                                bundles.push(Vec::new());
                                 continue;
                             }
                             let rendered = if matches!(format.as_ref(), Some(FieldFormat::Calldata))

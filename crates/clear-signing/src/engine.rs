@@ -487,6 +487,8 @@ fn render_group_field_kind<'a>(
                             )
                             .await?
                             {
+                                // Keep the slot so bundled groups stay aligned.
+                                bundles.push(Vec::new());
                                 continue;
                             }
                             let rendered = if matches!(format.as_ref(), Some(FieldFormat::Calldata))
@@ -1201,6 +1203,15 @@ fn visibility_context(label: &str, path: &str) -> String {
     }
 }
 
+/// JSON value used for `visible` comparisons. Signed integers become
+/// decimal strings so `mustMatch: ["-1"]` matches a negative value.
+fn visibility_json_value(val: &ArgumentValue) -> serde_json::Value {
+    match val {
+        ArgumentValue::Int(bytes) => serde_json::Value::String(int_to_bigint(bytes).to_string()),
+        _ => val.to_json_value(),
+    }
+}
+
 /// Check if a field should be visible based on the visibility rule and decoded value.
 fn check_visibility(
     rule: &VisibleRule,
@@ -1226,7 +1237,7 @@ fn check_visibility(
                 return Ok(true);
             };
 
-            let json_val = val.to_json_value();
+            let json_val = visibility_json_value(val);
             if cond.hides_for_if_not_in(&json_val) {
                 return Ok(false);
             }
