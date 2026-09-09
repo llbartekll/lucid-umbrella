@@ -6583,3 +6583,381 @@ async fn test_eip712_encryption_falls_back_like_calldata() {
         );
     }
 }
+
+#[tokio::test]
+async fn test_visible_must_match_compares_decimal_and_checksummed_address() {
+    let descriptor = Descriptor::from_json(
+        r#"{
+            "context": { "contract": { "deployments": [{"chainId": 1, "address": "0xabc"}] } },
+            "metadata": { "owner": "test", "enums": {}, "constants": {}, "maps": {} },
+            "display": {
+                "definitions": {},
+                "formats": {
+                    "show(uint8 kind,address zone,uint256 value)": {
+                        "intent": "Show",
+                        "fields": [
+                            { "path": "kind", "label": "Kind", "format": "raw", "visible": { "mustMatch": ["2", "3"] } },
+                            { "path": "zone", "label": "Zone", "format": "address", "visible": { "mustMatch": ["0xAbCdEf0000000000000000000000000000000001"] } },
+                            { "path": "value", "label": "Value", "format": "number" }
+                        ]
+                    }
+                }
+            }
+        }"#,
+    )
+    .unwrap();
+
+    let calldata = build_calldata(
+        "show(uint8,address,uint256)",
+        &[
+            uint_word(2),
+            addr_word("0xabcdef0000000000000000000000000000000001"),
+            uint_word(5),
+        ],
+    );
+    let tx = TransactionContext {
+        chain_id: 1,
+        to: "0xabc",
+        calldata: &calldata,
+        value: None,
+        from: None,
+        implementation_address: None,
+    };
+    let result = format_calldata(
+        &wrap_rd(descriptor.clone(), 1, "0xabc"),
+        &tx,
+        &EmptyDataProvider,
+    )
+    .await
+    .unwrap();
+    assert_eq!(result.entries.len(), 1);
+    match &result.entries[0] {
+        DisplayEntry::Item(item) => assert_eq!(item.label, "Value"),
+        _ => panic!("expected Item"),
+    }
+
+    let mismatching = build_calldata(
+        "show(uint8,address,uint256)",
+        &[
+            uint_word(4),
+            addr_word("0xabcdef0000000000000000000000000000000001"),
+            uint_word(5),
+        ],
+    );
+    let mismatching_tx = TransactionContext {
+        chain_id: 1,
+        to: "0xabc",
+        calldata: &mismatching,
+        value: None,
+        from: None,
+        implementation_address: None,
+    };
+    let err = format_calldata(
+        &wrap_rd(descriptor, 1, "0xabc"),
+        &mismatching_tx,
+        &EmptyDataProvider,
+    )
+    .await
+    .unwrap_err()
+    .to_string();
+    assert!(err.contains("visible.mustMatch"));
+}
+
+#[tokio::test]
+async fn test_visible_if_not_in_compares_json_number_with_decoded_uint() {
+    let descriptor = Descriptor::from_json(
+        r#"{
+            "context": { "contract": { "deployments": [{"chainId": 1, "address": "0xabc"}] } },
+            "metadata": { "owner": "test", "enums": {}, "constants": {}, "maps": {} },
+            "display": {
+                "definitions": {},
+                "formats": {
+                    "show(uint256 value)": {
+                        "intent": "Show",
+                        "fields": [
+                            { "path": "value", "label": "Value", "format": "number", "visible": { "ifNotIn": [0] } }
+                        ]
+                    }
+                }
+            }
+        }"#,
+    )
+    .unwrap();
+
+    let hidden = build_calldata("show(uint256)", &[uint_word(0)]);
+    let hidden_tx = TransactionContext {
+        chain_id: 1,
+        to: "0xabc",
+        calldata: &hidden,
+        value: None,
+        from: None,
+        implementation_address: None,
+    };
+    let hidden_result = format_calldata(
+        &wrap_rd(descriptor.clone(), 1, "0xabc"),
+        &hidden_tx,
+        &EmptyDataProvider,
+    )
+    .await
+    .unwrap();
+    assert!(hidden_result.entries.is_empty());
+
+    let shown = build_calldata("show(uint256)", &[uint_word(7)]);
+    let shown_tx = TransactionContext {
+        chain_id: 1,
+        to: "0xabc",
+        calldata: &shown,
+        value: None,
+        from: None,
+        implementation_address: None,
+    };
+    let shown_result = format_calldata(
+        &wrap_rd(descriptor, 1, "0xabc"),
+        &shown_tx,
+        &EmptyDataProvider,
+    )
+    .await
+    .unwrap();
+    assert_eq!(shown_result.entries.len(), 1);
+}
+
+#[tokio::test]
+async fn test_visible_must_match_compares_signed_int_as_decimal() {
+    let descriptor = Descriptor::from_json(
+        r#"{
+            "context": { "contract": { "deployments": [{"chainId": 1, "address": "0xabc"}] } },
+            "metadata": { "owner": "test", "enums": {}, "constants": {}, "maps": {} },
+            "display": {
+                "definitions": {},
+                "formats": {
+                    "show(int256 delta,int256 mask,uint256 value)": {
+                        "intent": "Show",
+                        "fields": [
+                            { "path": "delta", "label": "Delta", "format": "number", "visible": { "mustMatch": ["-1"] } },
+                            { "path": "mask", "label": "Mask", "format": "number", "visible": { "mustMatch": ["0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"] } },
+                            { "path": "value", "label": "Value", "format": "number" }
+                        ]
+                    }
+                }
+            }
+        }"#,
+    )
+    .unwrap();
+
+    let calldata = build_calldata(
+        "show(int256,int256,uint256)",
+        &[[0xffu8; 32], [0xffu8; 32], uint_word(5)],
+    );
+    let tx = TransactionContext {
+        chain_id: 1,
+        to: "0xabc",
+        calldata: &calldata,
+        value: None,
+        from: None,
+        implementation_address: None,
+    };
+    let result = format_calldata(&wrap_rd(descriptor, 1, "0xabc"), &tx, &EmptyDataProvider)
+        .await
+        .unwrap();
+    assert_eq!(result.entries.len(), 1);
+    match &result.entries[0] {
+        DisplayEntry::Item(item) => assert_eq!(item.label, "Value"),
+        _ => panic!("expected Item"),
+    }
+}
+
+#[tokio::test]
+async fn test_typed_visibility_must_match_compares_string_and_number() {
+    let descriptor = Descriptor::from_json(
+        r#"{
+            "context": { "eip712": { "deployments": [{"chainId": 1, "address": "0xabc"}] } },
+            "metadata": { "owner": "test", "enums": {}, "constants": {}, "maps": {} },
+            "display": {
+                "definitions": {},
+                "formats": {
+                    "Permit(uint8 kind,address zone,uint256 value)": {
+                        "intent": "Permit",
+                        "fields": [
+                            { "path": "kind", "label": "Kind", "format": "raw", "visible": { "mustMatch": [1, "0x02"] } },
+                            { "path": "zone", "label": "Zone", "format": "address", "visible": { "mustMatch": ["0xAbCdEf0000000000000000000000000000000001"] } },
+                            { "path": "value", "label": "Value", "format": "number" }
+                        ]
+                    }
+                }
+            }
+        }"#,
+    )
+    .unwrap();
+
+    let typed_data: TypedData = serde_json::from_value(serde_json::json!({
+        "types": {
+            "EIP712Domain": [],
+            "Permit": [
+                { "name": "kind", "type": "uint8" },
+                { "name": "zone", "type": "address" },
+                { "name": "value", "type": "uint256" }
+            ]
+        },
+        "primaryType": "Permit",
+        "domain": { "chainId": 1, "verifyingContract": "0xabc" },
+        "message": {
+            "kind": "2",
+            "zone": "0xabcdef0000000000000000000000000000000001",
+            "value": "9"
+        }
+    }))
+    .unwrap();
+
+    let result = format_typed_data(
+        &wrap_rd(descriptor, 1, "0xabc"),
+        &typed_data,
+        &EmptyDataProvider,
+    )
+    .await
+    .unwrap();
+    assert_eq!(result.entries.len(), 1);
+    match &result.entries[0] {
+        DisplayEntry::Item(item) => assert_eq!(item.label, "Value"),
+        _ => panic!("expected Item"),
+    }
+}
+
+#[tokio::test]
+async fn test_calldata_bundled_group_keeps_hidden_array_elements_aligned() {
+    let json = r#"{
+        "context": { "contract": { "deployments": [{"chainId": 1, "address": "0xabc"}] } },
+        "metadata": {"owner": "test", "enums": {}, "constants": {}, "maps": {}},
+        "display": {
+            "definitions": {},
+            "formats": {
+                "batch(address[] recipients,uint256[] amounts)": {
+                    "intent": "Batch",
+                    "fields": [{
+                        "label": "Transfers",
+                        "iteration": "bundled",
+                        "fields": [
+                            {
+                                "path": "recipients.[]",
+                                "label": "Recipient",
+                                "format": "address",
+                                "visible": { "mustMatch": ["0x0000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000002"] }
+                            },
+                            {"path": "amounts.[]", "label": "Hidden amount", "format": "number", "visible": "never"},
+                            {"path": "amounts.[]", "label": "Amount", "format": "number"}
+                        ]
+                    }]
+                }
+            }
+        }
+    }"#;
+
+    let descriptor = Descriptor::from_json(json).unwrap();
+    let calldata = build_two_array_calldata(
+        "batch(address[],uint256[])",
+        &[
+            "0x0000000000000000000000000000000000000001",
+            "0x0000000000000000000000000000000000000002",
+        ],
+        &[100, 200],
+    );
+    let tx = TransactionContext {
+        chain_id: 1,
+        to: "0xabc",
+        calldata: &calldata,
+        value: None,
+        from: None,
+        implementation_address: None,
+    };
+
+    let result = format_calldata(&wrap_rd(descriptor, 1, "0xabc"), &tx, &EmptyDataProvider)
+        .await
+        .unwrap();
+    match &result.entries[0] {
+        DisplayEntry::Group {
+            iteration, items, ..
+        } => {
+            assert!(matches!(iteration, GroupIteration::Bundled));
+            assert_eq!(items.len(), 2);
+            assert_eq!(items[0].label, "Amount");
+            assert_eq!(items[0].value, "100");
+            assert_eq!(items[1].label, "Amount");
+            assert_eq!(items[1].value, "200");
+        }
+        _ => panic!("expected bundled group"),
+    }
+}
+
+#[tokio::test]
+async fn test_eip712_bundled_group_keeps_hidden_array_elements_aligned() {
+    let descriptor = Descriptor::from_json(
+        r##"{
+            "context": { "eip712": { "deployments": [{"chainId": 1, "address": "0xabc"}] } },
+            "metadata": { "owner": "test", "enums": {}, "constants": {}, "maps": {} },
+            "display": {
+                "definitions": {},
+                "formats": {
+                    "Batch(Tip[] tips)Tip(uint8 itemType,address token,uint256 amount,address recipient)": {
+                        "intent": "Batch",
+                        "fields": [{
+                            "label": "Tips",
+                            "iteration": "bundled",
+                            "fields": [
+                                { "path": "tips.[].itemType", "label": "Tip type", "format": "raw", "visible": { "mustMatch": ["1", "2"] } },
+                                { "path": "tips.[].token", "label": "Tip token", "format": "address", "visible": "never" },
+                                { "path": "tips.[].amount", "label": "Tip amount", "format": "number" },
+                                { "path": "tips.[].recipient", "label": "Tip to", "format": "address" }
+                            ]
+                        }]
+                    }
+                }
+            }
+        }"##,
+    )
+    .unwrap();
+
+    let typed_data: TypedData = serde_json::from_value(serde_json::json!({
+        "types": {
+            "EIP712Domain": [],
+            "Batch": [{ "name": "tips", "type": "Tip[]" }],
+            "Tip": [
+                { "name": "itemType", "type": "uint8" },
+                { "name": "token", "type": "address" },
+                { "name": "amount", "type": "uint256" },
+                { "name": "recipient", "type": "address" }
+            ]
+        },
+        "primaryType": "Batch",
+        "domain": { "chainId": 1, "verifyingContract": "0xabc" },
+        "message": {
+            "tips": [{
+                "itemType": "1",
+                "token": "0x0000000000000000000000000000000000000001",
+                "amount": "100",
+                "recipient": "0x0000000000000000000000000000000000000002"
+            }]
+        }
+    }))
+    .unwrap();
+
+    let result = format_typed_data(
+        &wrap_rd(descriptor, 1, "0xabc"),
+        &typed_data,
+        &EmptyDataProvider,
+    )
+    .await
+    .unwrap();
+    match &result.entries[0] {
+        DisplayEntry::Group {
+            label,
+            iteration,
+            items,
+        } => {
+            assert_eq!(label, "Tips");
+            assert!(matches!(iteration, GroupIteration::Bundled));
+            assert_eq!(items.len(), 2);
+            assert_eq!(items[0].label, "Tip amount");
+            assert_eq!(items[1].label, "Tip to");
+        }
+        _ => panic!("expected bundled group"),
+    }
+}
